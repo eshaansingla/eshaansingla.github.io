@@ -7,7 +7,7 @@ Personal site of Eshaan Singla, laid out as a working paper. Every figure is a s
 | 1 | Bench test | The Pran rig on a test dummy replaying two real recordings (elevated.csv, non-elevated.csv), scored window by window with the repo's final XGBoost model |
 | 2 | Test runner | The Pran leakage audit (real numbers from the repo) |
 | 3 | FIN-X terminal | Simulated deal feed through the 3-tier LLM router with intent check |
-| 4 | Operations room | Street map with road routing, closures and the Hungarian assignment vs nearest-first (Sanchaalan Saathi); zooms from a street to all of India (India and Punjab outlines from DataMeet) |
+| 4 | Operations room | Street map with road routing, closures and the Hungarian assignment vs nearest-first (Sanchaalan Saathi); zooms from a street to the whole world (India outline: DataMeet; states and UTs: udit-001/india-maps-data; countries: Natural Earth) |
 | 5 | Traffic camera | Two-way traffic, front and rear plates with magnified crops, fixed vs glare-aware thresholds (plates are made up) |
 | 6 | Eval leaderboard | AETHER's real evaluation results, re-ranked by metric |
 | 7 | Legal desk | NyaayaBot's keyword gate, cited provision and 10-turn memory |

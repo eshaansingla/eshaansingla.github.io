@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Device, Stat, Toggle } from '../kit'
 
 /*
- * Fig. 4: FIN-X's Opportunity Radar, as a simulated live terminal.
+ * FIN-X's Opportunity Radar, as a simulated live terminal.
  * Deal cards stream in (simulated, labelled as such). Selecting one sends a question through
  * the same router as before: intent check, then Llama-3.3-70b, GPT-4o mini, rule engine.
  */

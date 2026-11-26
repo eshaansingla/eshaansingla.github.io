@@ -1,20 +1,23 @@
 import { useState } from 'react'
 import { Cite, Figure, H2, H3, Num, P, Row } from './ui'
 import { Btn, Seg } from './kit'
+import HardwareBench from './toys/HardwareBench'
 import AuditFig from './toys/AuditFig'
 import FilterToy from './toys/FilterToy'
 import Radar from './toys/Radar'
 import OpsRoom from './toys/OpsRoom'
 import TrafficCam from './toys/TrafficCam'
 import MetricRank from './toys/MetricRank'
+import LegalDesk from './toys/LegalDesk'
 import BottleneckToy from './toys/BottleneckToy'
 import RocketLeague from './toys/RocketLeague'
-import { archive, competitive, education, honors, profile, profileLinks, refs, skills } from '../data'
+import { competitive, education, honors, profile, profileLinks, refs, skills } from '../data'
 
 const RESULTS = [
   ['Pran', 'AUC on 29 untouched test subjects', '0.995', 'chance (0.5)', 'icp'],
   ['Pran', 'Sensitivity / specificity on the same subjects', '0.957 / 0.967', 'threshold set on validation only', 'icp'],
   ['Pran', 'Same pipeline, labels shuffled within subject', '0.501', 'should be ~0.5', 'icp'],
+  ['Pran', 'Hardware cost, full parts list', 'Rs 1,934', 'Rs 5,000 budget', 'icp'],
   ['FIN-X', 'Data rendering latency', '< 200 ms', 'two-phase load', 'finx'],
   ['FIN-X', 'Active users / requests per day, month 1', '100+ / 5,000+', '', 'finx'],
   ['FIN-X', 'API test suites', '22', '', 'finx'],
@@ -56,8 +59,7 @@ function ResultsTable() {
               <tr
                 key={proj + m}
                 onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })}
-                data-cursor="free"
-                data-cursor-label="jump"
+                data-cursor
                 className="group border-b border-rule transition-colors hover:bg-paper"
               >
                 <td className="py-2 pr-4 align-top text-[15px] text-mute">{proj}</td>
@@ -88,13 +90,16 @@ function Correspondence() {
           <a href={`mailto:${profile.email}`} className="break-all text-[clamp(1.3rem,3.2vw,2rem)] italic hover:text-signal">
             {profile.email}
           </a>
-          <Btn onClick={copy} aria-live="polite" data-cursor-label={copied ? 'copied' : 'copy address'}>
+          <a
+            href={`mailto:${profile.email}?subject=${encodeURIComponent('Hello Eshaan')}`}
+            className="inline-flex items-center gap-1.5 rounded-full bg-ink px-4 py-2 font-mono text-[12.5px] leading-none text-canvas transition-colors hover:bg-signal hover:text-signal-ink"
+          >
+            Mail me <span aria-hidden="true">↗</span>
+          </a>
+          <Btn onClick={copy} aria-live="polite">
             {copied ? 'copied ✓' : 'copy'}
           </Btn>
         </div>
-        <a href={`tel:${profile.phone.replace(/-/g, '')}`} className="mt-2 inline-block font-mono text-[14px] text-ink-2 hover:text-signal">
-          {profile.phone}
-        </a>
         <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3">
           {[...profileLinks, { label: 'Résumé', handle: 'PDF', href: profile.resume, download: true }].map((l) => (
             <a
@@ -131,15 +136,25 @@ export default function Paper() {
         where I have real numbers the figure uses them. Code for all of it is on GitHub <Cite n={1} />.
       </P>
 
-      <H3 id="icp" n="1.1" meta={<>Capstone, 2025–26, complete<br />Team of five; I led the ML and worked on data collection<br />ESP32, XGBoost, scikit-learn, SciPy, Flask<br />{code(5)}</>}>
+      <H3 id="icp" n="1.1" meta={<>Capstone, 2025–26, ongoing<br />Team of five; I led the ML and worked on data collection<br />ESP32, XGBoost, scikit-learn, SciPy, Flask<br />{code(5)}</>}>
         Pran: reading pressure changes through the eardrum
       </H3>
       <P>
         Intracranial pressure is normally measured with a probe through the skull. Our capstone
         asked a smaller question first: can a laser and a photodiode aimed at the eardrum see a
-        pressure change at all? The rig is an ESP32 reading a quad BPW34 photodiode through an
-        ADS1115, alongside a MAX30105 PPG and an MPU6050 IMU, at <Num>50 Hz</Num> <Cite n={5} />.
+        pressure change at all? <Cite n={5} />
       </P>
+      <P note={<>Parts list total about Rs 1,934<br />against a Rs 5,000 budget<br />no onboard signal processing</>}>
+        We built the sensor into an over-ear headphone. A 650 nm laser sits about 3 cm from the ear,
+        and four BPW34 photodiodes around it catch the reflected spot. Each photodiode feeds an
+        LM358 amplifier, an ADS1115 digitises all four, and an ESP32 on a hardware timer
+        samples them with a MAX30102 pulse sensor and an MPU6050 at exactly <Num>50 Hz</Num>,
+        printing one raw row every 20 ms. All analysis happens offline, so every number can be
+        reproduced from the recordings.
+      </P>
+      <Figure n={2} caption="The rig on a test dummy, replaying two real recordings. Elevated plays subject 83 M straining through the Valsalva manoeuvre; Not elevated plays subject 19 M lying flat. Pick any session, or click the timeline, to see the same person in another state. The rows are the actual CSV samples in the firmware’s format, the reflected spot follows the recorded displacement, and every 10 s window carries the score the repository’s final XGBoost model gave it, against the 0.54 threshold fixed on validation subjects. Both volunteers took part in the 146-subject study. Hover any part for what it does and what it cost.">
+        <HardwareBench />
+      </Figure>
       <P note={<>46,407 windows, 32 optical features<br />14 models, one protocol<br />test subjects scored once</>}>
         We recorded <Num>146</Num> volunteers lying flat, tilted head-up, tilted head-down and
         straining (the Valsalva manoeuvre). Before any modelling, <Num>29</Num> of them were set
@@ -150,13 +165,13 @@ export default function Paper() {
       <P>
         A number that high has to earn trust, so most of the work went into trying to break it:
         shuffled labels, held-out recording batches, early-versus-late splits and a plain linear
-        baseline. The result held every time (Fig. 2), and the custom optics turned out to be
+        baseline. The result held every time (Fig. 3), and the custom optics turned out to be
         what makes it work.
       </P>
-      <Figure n={2} caption="Seven attempts to break one result, every number taken from the repository. Run them, then open any row to see what it tests. Shuffled labels and elapsed time fall to chance, exactly as they should, while unseen subjects, recording batches and a simpler model all hold the result.">
+      <Figure n={3} caption="Seven attempts to break one result, every number taken from the repository. Run them, then open any row to see what it tests. Shuffled labels and elapsed time fall to chance, exactly as they should, while unseen subjects, recording batches and a simpler model all hold the result.">
         <AuditFig />
       </Figure>
-      <Figure n={3} caption="Why each window is filtered forward and then backward. A single pass removes noise but delays every peak, which corrupts timing features like the gap between P1 and P2. Running the filter again in reverse cancels the delay. Drag across the plot to move the cutoff and watch the lag.">
+      <Figure n={4} caption="Why each window is filtered forward and then backward. A single pass removes noise but delays every peak, which corrupts timing features like the gap between P1 and P2. Running the filter again in reverse cancels the delay. Drag across the plot to move the cutoff and watch the lag.">
         <FilterToy />
       </Figure>
 
@@ -176,7 +191,7 @@ export default function Paper() {
         from the models entirely. Auth uses JWT rotation, Google OAuth 2.0 and bcrypt-12, covered
         by <Num>22</Num> pytest suites <Cite n={7} />.
       </P>
-      <Figure n={4} caption="The Opportunity Radar, with a simulated feed. Deals stream in; pick one and the question goes through the real routing order: an intent check, then Llama-3.3-70b, GPT-4o mini if it is down, and the rule engine if both are. Switch providers off to watch the fallback, or ask your own follow-up. The render time is measured live in your browser.">
+      <Figure n={5} caption="The Opportunity Radar, with a simulated feed. Deals stream in; pick one and the question goes through the real routing order: an intent check, then Llama-3.3-70b, GPT-4o mini if it is down, and the rule engine if both are. Switch providers off to watch the fallback, or ask your own follow-up. The render time is measured live in your browser.">
         <Radar />
       </Figure>
 
@@ -190,7 +205,7 @@ export default function Paper() {
         shortage show up as one problem, assigns volunteers on skill, distance and workload, and
         checks the proof-of-completion photo before closing a task <Cite n={8} />.
       </P>
-      <Figure n={5} caption="The operations room as a live simulation. Field reports arrive, the extracted need, headcount and location fill in, the incident drops onto the map, and volunteers travel to it on the Hungarian assignment, re-solved every time something changes. Click the map to file your own report, drag a volunteer, or turn on nearest-first to see how much extra distance it would cost.">
+      <Figure n={6} caption="The operations room as a live simulation on a street map. A field report arrives, the need, headcount and area are read from it, and the incident drops onto the map. Volunteers then drive to it by road on the Hungarian assignment, re-solved whenever anything changes. A debris report closes its road until it is cleared, so routes detour round it and the river can only be crossed at the bridges. Click a road to file a report, drag the map or a volunteer, zoom in, or turn on nearest-first to see how much further it would drive.">
         <OpsRoom />
       </Figure>
 
@@ -203,7 +218,7 @@ export default function Paper() {
         climb as soon as headlights come on. Confidence thresholds that adapt to conditions, plus
         bounding-box refinement, cut low-light false positives by <Num>30%</Num> <Cite n={10} />.
       </P>
-      <Figure n={6} caption="A live traffic camera, illustrative rather than the trained model. Every car gets a tracked plate box; at night the headlights and wet road throw confident false boxes. Switch to glare-aware and they drop below the line while the plates stay. Slide toward day, drag the threshold, or click any box for its score.">
+      <Figure n={7} caption="A live camera over both carriageways, illustrative rather than the trained model, with made-up plates. Cars driving away are read from the rear plate and oncoming cars from the front, and each plate the detector keeps gets a magnified crop beside it. At night headlights, tail lights and the wet road throw confident false boxes; switch to glare-aware and they drop below the line while the plates stay. Slide toward day, drag the threshold, or click any box for its score.">
         <TrafficCam />
       </Figure>
 
@@ -218,7 +233,7 @@ export default function Paper() {
         search scored the lowest perplexity (<Num>8.82</Num>) yet matched the reference answers
         least closely.
       </P>
-      <Figure n={7} caption="Real results from AETHER’s evaluation run. Rank by perplexity and beam search wins; rank by agreement with a reference answer and it comes last. The metric you choose decides which strategy ships. Top-k and beam ran on a small local model, which is part of the story.">
+      <Figure n={8} caption="Real results from AETHER’s evaluation run. Rank by perplexity and beam search wins; rank by agreement with a reference answer and it comes last. The metric you choose decides which strategy ships. Top-k and beam ran on a small local model, which is part of the story.">
         <MetricRank />
       </Figure>
 
@@ -230,21 +245,10 @@ export default function Paper() {
         <Num>100+</Num> IPC categories. Intent recognition keeps it on topic, multi-turn memory
         keeps the context, and a ranking step ties each answer to the legal text it came from <Cite n={9} />.
       </P>
+      <Figure n={9} caption="One question at a time, with the work behind the answer laid open: the repository’s domain keywords decide whether it is in scope, candidate provisions are scored and the best one is cited, and the last ten exchanges travel with every question so a follow-up like “what if he still refuses?” still resolves. Try an off-topic question too. The provisions are real; the answers are written for this page, where the live bot asks Gemini.">
+        <LegalDesk />
+      </Figure>
 
-      <Row className="mt-12">
-        <p className="smallcaps mb-2 text-mute">Also on GitHub</p>
-        <ul className="border-t border-rule">
-          {archive.map((a) => (
-            <li key={a.name} className="border-b border-rule">
-              <a href={a.href} target="_blank" rel="noreferrer" className="group flex flex-wrap items-baseline gap-x-3 py-2.5">
-                <span className="font-mono text-[11px] text-mute">{a.year}</span>
-                <span className="text-[17px] group-hover:text-signal">{a.name}</span>
-                <span className="text-[15px] text-mute">{a.what}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
-      </Row>
 
       {/* ───────────── 2 EXPERIENCE ───────────── */}
       <H2 id="experience" n="2">Research experience</H2>
@@ -259,7 +263,7 @@ export default function Paper() {
         accelerometer epochs. Reworking the Pandas/NumPy feature pipeline made extraction{' '}
         <Num>40%</Num> faster over <Num>40,000+</Num> samples <Cite n={12} />.
       </P>
-      <Figure n={8} caption="The speed-up, as a puzzle. Stage times here are illustrative; the 40% is the measured result. Fix stages until the bar crosses the line, for as little effort as you can. Each fix changes which stage is slowest.">
+      <Figure n={10} caption="The speed-up, as a puzzle. Stage times here are illustrative; the 40% is the measured result. Fix stages until the bar crosses the line, for as little effort as you can. Each fix changes which stage is slowest.">
         <BottleneckToy />
       </Figure>
 
@@ -340,7 +344,7 @@ export default function Paper() {
         season, a peak of <Num>680</Num> MMR, and <Num>2,114</Num> lifetime wins. Saves are my
         best stat, in the top 20% of players tracked on tracker.gg.
       </P>
-      <Figure n={9} caption="Snapshot from tracker.gg (Epic, PC). Switch playlists to see each rank and click any lifetime stat for the detail. The emblems are drawn for this page.">
+      <Figure n={11} caption="Snapshot from tracker.gg (Epic, PC). Switch playlists to see each rank and click any lifetime stat for the detail. The emblems are drawn for this page.">
         <RocketLeague />
       </Figure>
 
@@ -363,8 +367,6 @@ export default function Paper() {
 
       <Row className="mb-16 mt-16">
         <p className="font-mono text-[11px] leading-relaxed text-mute">
-          Set in Newsreader and JetBrains Mono. Built with React, Vite, Tailwind and Framer Motion.
-          Figures 2 and 7 use real project data; the rest are simulations written for this page.
           © {new Date().getFullYear()} Eshaan Singla.
         </p>
       </Row>

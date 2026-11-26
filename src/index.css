@@ -58,8 +58,6 @@
   [id] { scroll-margin-top: 84px; }
 
   /* custom cursor replaces the native one only on fine pointers */
-  html.has-cursor, html.has-cursor * { cursor: none !important; }
-  html.has-cursor input[type='text'], html.has-cursor input:not([type]), html.has-cursor textarea { cursor: text !important; }
 
   /* range inputs: hairline track, square thumb */
   input[type='range'] {

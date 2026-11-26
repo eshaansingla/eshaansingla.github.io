@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Btn, Device, EASE, Tween } from '../kit'
 
-// Fig. 2, every number is from github.com/eshaansingla/Pran (hardware-vasalva-method/, testing/).
+// Pran leakage audit, every number is from github.com/eshaansingla/Pran (hardware-vasalva-method/, testing/).
 const CHECKS = [
   { name: 'Untouched final test, 29 subjects', v: 0.995, verdict: 'result',
     note: 'Scored once, after every modelling choice was frozen. Sensitivity 0.957, specificity 0.967 at the threshold picked on validation subjects.' },
@@ -77,7 +77,7 @@ export default function AuditFig() {
       statusLabel={running ? 'running' : 'ready'}
       toolbar={
         <>
-          <Btn primary onClick={runAll} disabled={running} data-cursor-label="attack the result">{running ? 'Running…' : done ? 'Run again' : 'Run every attack'}</Btn>
+          <Btn primary onClick={runAll} disabled={running}>{running ? 'Running…' : done ? 'Run again' : 'Run every attack'}</Btn>
           <div className="relative h-1.5 w-28 overflow-hidden rounded-full bg-ink/10">
             <motion.div className="absolute inset-y-0 left-0 rounded-full bg-signal" animate={{ width: `${(ran.size / CHECKS.length) * 100}%` }} transition={{ type: 'spring', stiffness: 140, damping: 22 }} />
           </div>
@@ -127,7 +127,6 @@ export default function AuditFig() {
                 data-row
                 onClick={() => toggle(i)}
                 aria-expanded={open === i}
-                data-cursor-label={isRan ? (open === i ? 'close' : 'why it matters') : 'run this check'}
                 className={`relative grid w-full grid-cols-[26px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-ink/[0.03] md:gap-x-4 ${COLS} ${open === i ? 'bg-ink/[0.03]' : ''}`}
               >
                 <span className="relative grid h-5 w-5 place-items-center">

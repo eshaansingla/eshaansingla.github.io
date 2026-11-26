@@ -75,8 +75,8 @@ export default function TitleBlock() {
             <a href={profile.resume} download className="inline-block rounded-full bg-ink px-5 py-3 font-mono text-[12.5px] leading-none text-canvas transition-colors hover:bg-signal hover:text-signal-ink">
               Download résumé (PDF)
             </a>
-            <a href="#references" className="inline-block rounded-full border border-ink/30 px-5 py-3 font-mono text-[12.5px] leading-none transition-colors hover:border-signal hover:text-signal">
-              Correspondence →
+            <a href={`mailto:${profile.email}?subject=${encodeURIComponent('Hello Eshaan')}`} className="inline-block rounded-full border border-ink/30 px-5 py-3 font-mono text-[12.5px] leading-none transition-colors hover:border-signal hover:text-signal">
+              Mail me ↗
             </a>
           </div>
         </motion.div>
@@ -86,7 +86,7 @@ export default function TitleBlock() {
         id="fig-1"
         n={1}
         caption={
-          <>The four postures our 146 volunteers went through: head-up 30°, supine, head-down 10° and the Valsalva manoeuvre. The simulated pulse responds in proportion to the response measured in the repository: unchanged head-up, a clear lift head-down, and the largest change on Valsalva, where P2 climbs past P1. Pick a manoeuvre (or press 1–4), hold the trace or Space for Valsalva, and click a readout for the numbers.</>
+          <>The four postures our 146 volunteers went through: head-up 30°, supine, head-down 10° and the Valsalva manoeuvre. The simulated pulse responds in proportion to the response measured in the repository: unchanged head-up, a clear lift head-down, and the largest change on Valsalva, where P2 climbs past P1. Pick a manoeuvre (or press 1–4), hold the trace for Valsalva, and click a readout for the numbers.</>
         }
       >
         <Monitor man={man} setMan={setMan} />

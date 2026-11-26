@@ -83,13 +83,12 @@ export function Btn({ children, primary, className = '', ...p }) {
 }
 
 /** Toggle switch with a springy knob. */
-export function Toggle({ on, onChange, label, cursorLabel }) {
+export function Toggle({ on, onChange, label }) {
   return (
     <button
       role="switch"
       aria-checked={on}
       aria-label={label}
-      data-cursor-label={cursorLabel}
       onClick={() => onChange(!on)}
       className={`relative inline-flex h-[22px] w-[40px] shrink-0 items-center rounded-full transition-colors duration-300 ${on ? 'bg-signal' : 'bg-ink/15'}`}
     >

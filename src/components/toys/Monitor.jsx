@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import SignalCanvas, { p1, p2 } from '../SignalCanvas'
 import { Device, Panel, Seg } from '../kit'
 
-// Fig. 1, presented as an amber bedside monitor. Logic lives in SignalCanvas (unchanged).
+// Fig. 1: a bedside monitor for the Pran rig. The waveform itself is drawn by SignalCanvas.
 function Fps() {
   const ref = useRef(null)
   useEffect(() => {
@@ -48,39 +48,28 @@ const INFO = {
 }
 
 export default function Monitor({ man, setMan }) {
-  const mode = 'physio'
   const [strain, setStrain] = useState(false)
   const [panel, setPanel] = useState(null)
   const readoutRef = useRef(null)
   const kRef = useRef(null)
-  const hold = mode === 'physio'
   const active = strain ? byMan.valsalva : byMan[man]
   const level = levelOf(active)
   const close = useCallback(() => setPanel(null), [])
 
+  // 1-4 pick a manoeuvre while the figure is on screen (ignored while typing)
   useEffect(() => {
-    const down = (e) => {
-      if (e.code !== 'Space' || e.repeat || e.target !== document.body) return
-      const r = document.getElementById('fig-1')?.getBoundingClientRect()
-      if (!r || r.bottom < 0 || r.top > innerHeight) return
-      e.preventDefault()
-      setStrain(true)
-    }
     const pick = (e) => {
-      if (e.target !== document.body || !['Digit1', 'Digit2', 'Digit3', 'Digit4'].includes(e.code)) return
+      if (e.target.closest?.('input, textarea, [contenteditable]') || !['Digit1', 'Digit2', 'Digit3', 'Digit4'].includes(e.code)) return
       const r = document.getElementById('fig-1')?.getBoundingClientRect()
       if (!r || r.bottom < 0 || r.top > innerHeight) return
+      setStrain(false)
       setMan(MANOEUVRES[+e.code.slice(-1) - 1].id)
     }
     addEventListener('keydown', pick)
-    const up = (e) => e.code === 'Space' && setStrain(false)
-    addEventListener('keydown', down)
-    addEventListener('keyup', up)
-    return () => { removeEventListener('keydown', down); removeEventListener('keydown', pick); removeEventListener('keyup', up) }
+    return () => removeEventListener('keydown', pick)
   }, [setMan])
 
   const press = (e) => {
-    if (!hold) return
     if (e.pointerType === 'mouse' && e.button !== 0) return
     e.currentTarget.setPointerCapture?.(e.pointerId)
     setStrain(true)
@@ -91,41 +80,33 @@ export default function Monitor({ man, setMan }) {
   if (panel) last.current = panel.replace(/\d$/, '')
   const info = INFO[last.current]
 
-  const tiles = hold
-    ? [
-        { id: 'hr', label: 'HR', value: '72', unit: 'bpm' },
-        { id: 'ratio', label: 'P2 / P1', live: true, unit: active.idx > 0.1 ? 'rising' : 'baseline' },
-        { id: 'state', label: active.label, value: fmtIdx(active.idx), unit: active.id === 'supine' ? 'reference' : `SD vs supine, rose in ${active.rise}`, bar: true },
-      ]
-    : []
+  const tiles = [
+    { id: 'hr', label: 'HR', value: '72', unit: 'bpm' },
+    { id: 'ratio', label: 'P2 / P1', live: true, unit: active.idx > 0.1 ? 'rising' : 'baseline' },
+    { id: 'state', label: active.label, value: fmtIdx(active.idx), unit: active.id === 'supine' ? 'reference' : `SD vs supine, rose in ${active.rise}`, bar: true },
+  ]
 
   return (
     <Device
       className="dark"
       name="PRAN-01"
-      sub={hold ? `tympanic optical + PPG, ch1, ${active.note}` : ''}
+      sub={`tympanic optical + PPG, ${active.note}`}
       status="live"
       statusLabel="sim"
       toolbar={
         <>
-          <AnimatePresence>
-            {hold && (
-              <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} className="overflow-x-auto">
-                <Seg size="sm" label="Manoeuvre" value={strain ? 'valsalva' : man} onChange={(v) => { setStrain(false); setMan(v) }} options={MANOEUVRES.map((m) => [m.id, m.label])} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-          {hold && (
-            <span className="ml-auto hidden font-mono text-[11px] text-mute xl:inline">
-              Keys <kbd className="rounded border border-ink/20 px-1 text-ink">1</kbd>–<kbd className="rounded border border-ink/20 px-1 text-ink">4</kbd>, hold <kbd className="rounded border border-ink/20 px-1 text-ink">Space</kbd>
-            </span>
-          )}
+          <div className="overflow-x-auto">
+            <Seg size="sm" label="Manoeuvre" value={strain ? 'valsalva' : man} onChange={(v) => { setStrain(false); setMan(v) }} options={MANOEUVRES.map((m) => [m.id, m.label])} />
+          </div>
+          <span className="ml-auto hidden font-mono text-[11px] text-mute xl:inline">
+            Keys <kbd className="rounded border border-ink/20 px-1 text-ink">1</kbd> to <kbd className="rounded border border-ink/20 px-1 text-ink">4</kbd>
+          </span>
         </>
       }
       footer={
         <>
-          <span>{hold ? '50 Hz, 1 s per division' : ''}</span>
-          <span>{hold ? 'response scaled to the 146-subject means' : ''}</span>
+          <span>50 Hz, 1 s per division</span>
+          <span>response scaled to the 146-subject means</span>
           <span className="ml-auto"><Fps /></span>
         </>
       }
@@ -134,17 +115,17 @@ export default function Monitor({ man, setMan }) {
         {/* screen */}
         <div
           className="relative h-[250px] touch-pan-y select-none overflow-hidden md:h-[330px]"
-          data-cursor={hold ? 'hold' : 'probe'}
+          data-cursor
           onPointerDown={press}
           onPointerUp={release}
           onPointerCancel={release}
-          onContextMenu={(e) => hold && e.preventDefault()}
+          onContextMenu={(e) => e.preventDefault()}
         >
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_90%_at_50%_45%,transparent_55%,rgb(0_0_0/0.45))]" />
-          <SignalCanvas mode={mode} level={hold ? level : 0} readoutRef={readoutRef} kRef={kRef} hint={hold ? `${active.label}${strain ? '' : ', hold for Valsalva'}` : ''} />
+          <SignalCanvas level={level} readoutRef={readoutRef} kRef={kRef} label={strain ? 'Valsalva' : 'hold for Valsalva'} />
           <div className="pointer-events-none absolute inset-0 opacity-[0.05] [background:repeating-linear-gradient(0deg,#fff_0_1px,transparent_1px_3px)]" />
           <AnimatePresence>
-            {hold && active.id === 'valsalva' && (
+            {active.id === 'valsalva' && (
               <motion.span
                 initial={{ opacity: 0 }} animate={{ opacity: [0.25, 0.6, 0.25] }} exit={{ opacity: 0 }}
                 transition={{ duration: 1.1, repeat: Infinity }}
@@ -152,16 +133,14 @@ export default function Monitor({ man, setMan }) {
               />
             )}
           </AnimatePresence>
-          {hold && (
-            <button
-              className={`absolute bottom-3 right-3 rounded-full px-3.5 py-2 font-mono text-[11.5px] shadow transition-colors md:hidden ${strain ? 'bg-signal text-signal-ink' : 'bg-ink text-canvas'}`}
-              aria-pressed={strain}
-              onPointerDown={press}
-              onPointerUp={release}
-            >
-              {strain ? 'Valsalva…' : 'hold for Valsalva'}
-            </button>
-          )}
+          <button
+            className={`absolute bottom-3 right-3 rounded-full px-3.5 py-2 font-mono text-[11.5px] shadow transition-colors md:hidden ${strain ? 'bg-signal text-signal-ink' : 'bg-ink text-canvas'}`}
+            aria-pressed={strain}
+            onPointerDown={press}
+            onPointerUp={release}
+          >
+            {strain ? 'Valsalva…' : 'hold for Valsalva'}
+          </button>
         </div>
 
         {/* readouts */}
@@ -170,7 +149,6 @@ export default function Monitor({ man, setMan }) {
             <button
               key={t.id + i}
               onClick={() => setPanel(panel === t.id + i ? null : t.id + i)}
-              data-cursor-label="details"
               className={`group relative flex flex-col justify-between gap-1 p-3 text-left transition-colors hover:bg-ink/[0.04] md:p-4 ${i ? 'border-l border-rule md:border-l-0 md:border-t' : ''} ${panel === t.id + i ? 'bg-ink/[0.05]' : ''}`}
             >
               <span className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.14em] text-mute">

@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Btn, Device, Panel, Stat, Tween } from '../kit'
 
-// Fig. 8, find the bottleneck. Stage times are illustrative; the −40% target is the measured result.
+// Internship speed-up, find the bottleneck. Stage times are illustrative; the −40% target is the measured result.
 const STAGES = [
   { id: 'load', name: 'load recordings', before: 110, after: 95, effort: 2, fix: 'memory-mapped reads' },
   { id: 'resample', name: 'resample', before: 170, after: 110, effort: 1, fix: 'one polyphase pass' },
@@ -68,7 +68,6 @@ export default function BottleneckToy() {
                 <motion.button
                   key={s.id}
                   onClick={() => setSel(s.id)}
-                  data-cursor-label={`${s.name}, ${t(s)} ms, ${Math.round((t(s) / total) * 100)}%`}
                   title={`${s.name}: ${t(s)} ms`}
                   className={`relative h-full shrink-0 overflow-hidden rounded-lg text-left font-mono text-[10.5px] leading-tight ${
                     isB ? 'bg-signal text-signal-ink' : on ? 'bg-ink/15 text-ink' : 'bg-ink text-canvas'
@@ -125,7 +124,6 @@ export default function BottleneckToy() {
                 <motion.button
                   layout
                   onClick={() => flip(s.id)}
-                  data-cursor-label={on ? 'undo' : `fix, effort ${s.effort}`}
                   className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors ${
                     on ? 'border-signal/50 bg-signal/[0.06]' : isB ? 'border-signal/70' : 'border-rule hover:border-ink/40'
                   }`}

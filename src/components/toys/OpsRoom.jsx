@@ -2,17 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Device, Panel, Stat, Toggle, Tween } from '../kit'
 import { cssVar, onThemeChange } from '../../theme'
+import { MH, MW, M_PER_UNIT, POIS, areaName, drawMap, mulberry, randomRoadPoint, route, shortest, snap } from './opsMap'
 
 /*
- * Fig. 5: the Sanchaalan Saathi operations room, as a live simulation.
+ * Sanchaalan Saathi figure: the Sanchaalan Saathi operations room, as a live simulation on a street map.
  * Field reports arrive, extraction fills in the structured task, the incident drops onto the map,
- * and volunteers travel to it on the Hungarian assignment (solved live on every change).
+ * and volunteers drive to it along the roads on the Hungarian assignment (re-solved on every change).
+ * Costs are road distances. A debris report closes its road until it is cleared, so routes detour.
  * Nearest-first is computed on the same snapshot so the waste figure compares like for like.
  */
-const MW = 760, MH = 420
 const KINDS = ['food supplies', 'medical camp', 'shelter', 'drinking water', 'debris clearing']
 const URG = ['low', 'medium', 'high']
-const d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1])
+const SPEED = 62 // map units per second
+const BIG = 1e7 // cost of an unreachable pair
 
 function hungarian(a) {
   const n = a.length, m = a[0].length, INF = 1e18
@@ -43,45 +45,39 @@ function hungarian(a) {
   for (let j = 1; j <= m; j++) if (p[j]) out.push([p[j] - 1, j - 1])
   return out
 }
-function solve(V, T) {
-  if (!V.length || !T.length) return []
-  const vt = V.length <= T.length
-  const M = vt ? V.map((p) => T.map((t) => d(p, t))) : T.map((t) => V.map((p) => d(p, t)))
-  return hungarian(M).map(([r, c]) => (vt ? [r, c] : [c, r]))
+/** Min-cost matching on a volunteers × tasks cost matrix (rectangular either way). */
+function solve(C) {
+  if (!C.length || !C[0].length) return []
+  if (C.length <= C[0].length) return hungarian(C)
+  const T = C[0].map((_, j) => C.map((row) => row[j]))
+  return hungarian(T).map(([r, c]) => [c, r])
 }
-function greedy(V, T) {
+/** Nearest-first: repeatedly take the globally closest free pair. */
+function greedy(C) {
   const uv = new Set(), ut = new Set(), pairs = []
-  for (let k = 0; k < Math.min(V.length, T.length); k++) {
-    let m = Infinity, bi, bj
-    V.forEach((p, i) => !uv.has(i) && T.forEach((t, j) => { if (!ut.has(j) && d(p, t) < m) { m = d(p, t); bi = i; bj = j } }))
+  for (let k = 0; k < Math.min(C.length, C[0]?.length || 0); k++) {
+    let m = Infinity, bi = -1, bj = -1
+    C.forEach((row, i) => !uv.has(i) && row.forEach((c, j) => { if (!ut.has(j) && c < m) { m = c; bi = i; bj = j } }))
+    if (bi < 0) break
     uv.add(bi); ut.add(bj); pairs.push([bi, bj])
   }
   return pairs
 }
-
-function mulberry(a) {
-  return () => {
-    a |= 0
-    a = (a + 0x6d2b79f5) | 0
-    let t = Math.imul(a ^ (a >>> 15), 1 | a)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
-
-const ROADS_H = [70, 160, 250, 340]
-const ROADS_V = [110, 260, 420, 590, 700]
+const hex = (a) => Math.round(Math.max(0, Math.min(1, a)) * 255).toString(16).padStart(2, '0')
+const km = (u) => `${((u * M_PER_UNIT) / 1000).toFixed(2)} km`
 
 export default function OpsRoom() {
   const [feed, setFeed] = useState([])
-  const [stats, setStats] = useState({ open: 0, resolved: 0, avg: 0, cost: 0, waste: 0 })
+  const [stats, setStats] = useState({ open: 0, resolved: 0, avg: 0, waste: 0, closed: 0 })
   const [showGreedy, setShowGreedy] = useState(false)
   const [paused, setPaused] = useState(false)
   const [sel, setSel] = useState(null)
+  const [zoom, setZoom] = useState(1)
   const closeSel = useCallback(() => setSel(null), [])
   const wrap = useRef(null)
   const canvas = useRef(null)
   const api = useRef({})
+  const view = useRef({ k: 1, tx: 0, ty: 0 })
   const flags = useRef({ showGreedy, paused })
   flags.current = { showGreedy, paused }
 
@@ -90,257 +86,318 @@ export default function OpsRoom() {
     const ctx = cv.getContext('2d')
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
     const rnd = mulberry(7)
-    let W = 0, H = 0, sx = 1, raf = 0, prev = performance.now(), simT = 0, nextTask = 1, spawnIn = 2.5
-    let C = {}
-    const colors = () => { C = { ink: cssVar('--ink', wrap.current), signal: cssVar('--signal', wrap.current), paper: cssVar('--paper', wrap.current), rule: cssVar('--rule-2', wrap.current), mute: cssVar('--mute', wrap.current) } }
+    let W = 0, H = 0, dpr = 1, raf = 0, prev = performance.now(), simT = 0, nextTask = 1, spawnIn = 2.5, visible = true
+    let C = {}, dark = false
+    const colors = () => {
+      C = { ink: cssVar('--ink', wrap.current), signal: cssVar('--signal', wrap.current), paper: cssVar('--paper', wrap.current), mute: cssVar('--mute', wrap.current) }
+      dark = document.documentElement.classList.contains('dark')
+    }
     colors()
 
-    const vols = [[150, 150], [262, 118], [380, 186], [520, 196], [318, 300]].map((p, i) => ({ id: i + 1, x: p[0], y: p[1], task: null, trail: [] }))
+    const hub = POIS.find((p) => p.kind === 'hub')
+    const start = [[96, 196], [150, 150], [262, 120], [372, 230], [478, 384]]
+    const vols = start.map(([x, y], i) => { const s = snap(x, y); return { id: i + 1, x: s.x, y: s.y, pos: s, task: null, path: [], trail: [] } })
     const tasks = []
-    let resolved = 0, respSum = 0, lastCost = 0, lastWaste = 0, greedyPairs = [], optSum = 0, greedySum = 0
+    const closed = new Set()
+    let sp = shortest(closed)
+    let resolved = 0, respSum = 0, optSum = 0, greedySum = 0, greedyRoutes = []
 
-    const pushFeed = (t) => setFeed((f) => [{ id: t.id, kind: t.kind, urg: t.urg, people: t.people, sector: t.sector, status: 'extracting', vol: null, born: Date.now() }, ...f].slice(0, 5))
+    const pushFeed = (t) => setFeed((f) => [{ id: t.id, kind: t.kind, urg: t.urg, people: t.people, where: t.where, status: 'extracting', vol: null }, ...f].slice(0, 5))
     const patchFeed = (id, patch) => setFeed((f) => f.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+    const sync = () => setStats({ open: tasks.filter((t) => t.state !== 'resolved').length, resolved, avg: resolved ? respSum / resolved : 0, waste: optSum ? ((greedySum - optSum) / optSum) * 100 : 0, closed: closed.size })
 
-    const addTask = (x, y, silent) => {
+    const setClosures = () => {
+      closed.clear()
+      tasks.forEach((t) => { if (t.kind === 'debris clearing' && t.state !== 'incoming' && t.state !== 'resolved') closed.add(t.pos.e.id) })
+      sp = shortest(closed)
+    }
+
+    const addTask = (pos, silent, kind) => {
       const t = {
-        id: nextTask++, x, y, kind: KINDS[Math.floor(rnd() * KINDS.length)], urg: URG[Math.floor(rnd() * 3)],
-        people: 10 + Math.floor(rnd() * 60), sector: `Sector ${1 + Math.floor((x / MW) * 4) + 4 * Math.floor((y / MH) * 3)}`,
-        state: silent ? 'open' : 'incoming', born: simT, t0: simT, vol: null,
+        id: nextTask++, pos, x: pos.x, y: pos.y, kind: kind || KINDS[Math.floor(rnd() * KINDS.length)], urg: URG[Math.floor(rnd() * 3)],
+        people: 10 + Math.floor(rnd() * 60), where: areaName(pos.x, pos.y), state: silent ? 'open' : 'incoming', born: simT, t0: simT, vol: null,
       }
       tasks.push(t)
       pushFeed(t)
-      if (silent) { patchFeed(t.id, { status: 'open' }); reassign() }
+      if (silent) { patchFeed(t.id, { status: 'open' }); setClosures(); reassign() }
       return t
     }
+
+    // Re-solve: every volunteer not already on site, against every open task, on road distance.
     const reassign = () => {
       const open = tasks.filter((t) => t.state === 'open')
-      const V = vols.filter((v) => !v.task || v.task.state === 'open').map((v) => v)
-      V.forEach((v) => { if (v.task && v.task.state === 'open') { v.task.vol = null; v.task = null } })
-      const pairs = solve(V.map((v) => [v.x, v.y]), open.map((t) => [t.x, t.y]))
-      pairs.forEach(([vi, ti]) => { V[vi].task = open[ti]; open[ti].vol = V[vi] })
-      lastCost = pairs.reduce((s, [vi, ti]) => s + d([V[vi].x, V[vi].y], [open[ti].x, open[ti].y]), 0)
-      const gp = greedy(V.map((v) => [v.x, v.y]), open.map((t) => [t.x, t.y]))
-      greedyPairs = gp.map(([vi, ti]) => [V[vi], open[ti]])
-      const gc = gp.reduce((s, [vi, ti]) => s + d([V[vi].x, V[vi].y], [open[ti].x, open[ti].y]), 0)
-      // running total over every dispatch decision so far, so the figure does not flicker to 0 when one task is open
-      if (pairs.length) { optSum += lastCost; greedySum += gc }
-      lastWaste = optSum ? ((greedySum - optSum) / optSum) * 100 : 0
+      const V = vols.filter((v) => !v.task || v.task.state === 'open')
+      V.forEach((v) => { if (v.task) { v.task.vol = null; v.task = null; v.path = [] } })
+      const R = V.map((v) => open.map((t) => route(v.pos, t.pos, sp)))
+      const cost = R.map((row) => row.map((r) => (r ? r.dist : BIG)))
+      const pairs = solve(cost).filter(([vi, ti]) => cost[vi][ti] < BIG)
+      pairs.forEach(([vi, ti]) => { const v = V[vi], t = open[ti]; v.task = t; t.vol = v; v.path = R[vi][ti].pts.slice(1) })
+      const gp = greedy(cost).filter(([vi, ti]) => cost[vi][ti] < BIG)
+      greedyRoutes = gp.map(([vi, ti]) => ({ pts: R[vi][ti].pts, t: open[ti] }))
+      if (pairs.length) {
+        optSum += pairs.reduce((s, [vi, ti]) => s + cost[vi][ti], 0)
+        greedySum += gp.reduce((s, [vi, ti]) => s + cost[vi][ti], 0)
+      }
       open.forEach((t) => patchFeed(t.id, { status: t.vol ? 'assigned' : 'waiting', vol: t.vol ? t.vol.id : null }))
       sync()
     }
-    const sync = () => setStats({ open: tasks.filter((t) => t.state !== 'resolved').length, resolved, avg: resolved ? respSum / resolved : 0, cost: lastCost, waste: lastWaste })
 
-    // seed the board
-    ;[[96, 74], [318, 48], [560, 92], [468, 252], [190, 250]].forEach(([x, y]) => addTask(x, y, true))
+    // seed the board, including one blocked road
+    ;[[96, 70], [372, 80], [596, 160], [520, 304], [206, 384]].forEach(([x, y], i) => addTask(snap(x, y), true, i === 3 ? 'debris clearing' : undefined))
+
+    // ── view transform (zoom about a point, pan, clamp so the map always fills the frame) ──
+    const clampView = () => {
+      const v = view.current
+      v.tx = Math.min(0, Math.max(MW - MW * v.k, v.tx))
+      v.ty = Math.min(0, Math.max(MH - MH * v.k, v.ty))
+    }
+    const zoomAt = (k, mx = MW / 2, my = MH / 2) => {
+      const v = view.current
+      const nk = Math.max(1, Math.min(3, k))
+      v.tx = mx - ((mx - v.tx) / v.k) * nk
+      v.ty = my - ((my - v.ty) / v.k) * nk
+      v.k = nk
+      clampView()
+      setZoom(nk)
+    }
 
     api.current = {
-      report: (x, y) => { const t = addTask(x, y, true); return t },
-      addVol: () => { if (vols.length >= 8) return; vols.push({ id: vols.length + 1, x: 60 + rnd() * 640, y: 60 + rnd() * 300, task: null, trail: [] }); reassign() },
+      report: (x, y) => addTask(snap(x, y), true),
+      addVol: () => {
+        if (vols.length >= 8) return
+        const s = snap(hub.x, hub.y + 30)
+        vols.push({ id: vols.length + 1, x: s.x, y: s.y, pos: s, task: null, path: [], trail: [] })
+        reassign()
+      },
       hit: (x, y) => {
-        const v = vols.find((q) => Math.hypot(q.x - x, q.y - y) < 16)
+        const r = 14 / view.current.k
+        const v = vols.find((q) => Math.hypot(q.x - x, q.y - y) < r)
         if (v) return { kind: 'v', v }
-        const t = tasks.find((q) => q.state !== 'resolved' && Math.hypot(q.x - x, q.y - y) < 18)
+        const t = tasks.find((q) => q.state !== 'resolved' && Math.hypot(q.x - x, q.y - 12 / view.current.k - y) < r + 4)
         return t ? { kind: 't', t } : null
       },
-      drag: (v, x, y) => { v.x = Math.max(10, Math.min(MW - 10, x)); v.y = Math.max(10, Math.min(MH - 10, y)); v.trail = [] },
-      dropped: () => reassign(),
+      drag: (v, x, y) => { v.x = x; v.y = y; v.trail = [] },
+      dropped: (v) => { const s = snap(v.x, v.y); v.x = s.x; v.y = s.y; v.pos = s; reassign() },
+      pan: (dx, dy) => { view.current.tx += dx; view.current.ty += dy; clampView() },
+      zoomAt,
+      linked: (t) => tasks.filter((o) => o !== t && o.state !== 'resolved' && t.kind === 'debris clearing' && o.vol && o.vol.path.length && Math.hypot(o.x - t.x, o.y - t.y) < 260).map((o) => o.id),
     }
 
     const resize = () => {
-      const dpr = Math.min(devicePixelRatio || 1, 2)
+      dpr = Math.min(devicePixelRatio || 1, 2)
       const r = wrap.current.getBoundingClientRect()
       W = r.width
       H = r.height
-      sx = W / MW
       cv.width = W * dpr
       cv.height = H * dpr
-      ctx.setTransform(dpr * sx, 0, 0, dpr * (H / MH), 0, 0)
     }
     resize()
     const ro = new ResizeObserver(resize)
     ro.observe(wrap.current)
+    const io = new IntersectionObserver(([e]) => (visible = e.isIntersecting))
+    io.observe(wrap.current)
     const offTheme = onThemeChange(colors)
 
-    const frame = (now) => {
-      const dt = Math.min(0.05, (now - prev) / 1000)
-      prev = now
-      const F = flags.current
-      const run = !F.paused && !reduced
-      if (run) simT += dt
-      const t = now / 1000
-
-      // incoming reports: extraction takes ~1.4 s, then the task goes on the map
+    const step = (dt) => {
+      simT += dt
       tasks.forEach((tk) => {
-        if (tk.state === 'incoming' && simT - tk.t0 > 1.4) { tk.state = 'open'; tk.t0 = simT; reassign() }
+        if (tk.state === 'incoming' && simT - tk.t0 > 1.4) { tk.state = 'open'; tk.t0 = simT; patchFeed(tk.id, { status: 'open' }); setClosures(); reassign() }
       })
-      if (run) {
-        spawnIn -= dt
-        if (spawnIn <= 0 && tasks.filter((x) => x.state !== 'resolved').length < 7) {
-          const rx = 50 + rnd() * (MW - 100), ry = 40 + rnd() * (MH - 80)
-          addTask(rx, ry, false)
-          spawnIn = 3 + rnd() * 2.5
-        }
-        // move volunteers along their assignment
-        vols.forEach((v) => {
-          const tk = v.task
-          if (tk && tk.state === 'open') {
-            const dx = tk.x - v.x, dy = tk.y - v.y, L = Math.hypot(dx, dy)
-            const sp = 70 * dt
-            if (L <= sp + 0.5) { v.x = tk.x; v.y = tk.y; tk.state = 'verifying'; tk.t0 = simT; patchFeed(tk.id, { status: 'verifying' }) }
-            else { v.x += (dx / L) * sp; v.y += (dy / L) * sp }
-            v.trail.push([v.x, v.y, simT])
-          }
-          v.trail = v.trail.filter((p) => simT - p[2] < 1.6)
-        })
-        // verification then resolve
-        tasks.forEach((tk) => {
-          if (tk.state === 'verifying' && simT - tk.t0 > 1.6) {
-            tk.state = 'resolved'; tk.t0 = simT; resolved++; respSum += simT - tk.born
-            patchFeed(tk.id, { status: 'resolved' })
-            if (tk.vol) { tk.vol.task = null; tk.vol = null }
-            reassign()
-          }
-        })
-        for (let i = tasks.length - 1; i >= 0; i--) if (tasks[i].state === 'resolved' && simT - tasks[i].t0 > 1.2) tasks.splice(i, 1)
+      spawnIn -= dt
+      if (spawnIn <= 0 && tasks.filter((x) => x.state !== 'resolved').length < 7) {
+        addTask(randomRoadPoint(rnd), false)
+        spawnIn = 3 + rnd() * 2.5
       }
-
-      // ── draw map ──
-      ctx.clearRect(0, 0, MW, MH)
-      ctx.fillStyle = C.paper
-      ctx.fillRect(0, 0, MW, MH)
-      // blocks
-      ctx.fillStyle = C.ink + '0d'
-      for (let i = 0; i < ROADS_V.length + 1; i++) for (let j = 0; j < ROADS_H.length + 1; j++) {
-        const x0 = i ? ROADS_V[i - 1] + 9 : 0, x1 = i < ROADS_V.length ? ROADS_V[i] - 9 : MW
-        const y0 = j ? ROADS_H[j - 1] + 9 : 0, y1 = j < ROADS_H.length ? ROADS_H[j] - 9 : MH
-        if (x1 - x0 < 10 || y1 - y0 < 10) continue
-        rr(ctx, x0 + 4, y0 + 4, x1 - x0 - 8, y1 - y0 - 8, 8); ctx.fill()
-      }
-      // park + river
-      ctx.fillStyle = C.ink + '12'
-      rr(ctx, 440, 274, 130, 50, 10); ctx.fill()
-      ctx.strokeStyle = C.ink + '14'
-      ctx.lineWidth = 26
-      ctx.lineCap = 'round'
-      ctx.beginPath(); ctx.moveTo(-20, 200); ctx.bezierCurveTo(140, 150, 260, 250, 400, 205); ctx.bezierCurveTo(540, 160, 640, 190, 790, 170); ctx.stroke()
-      // road names
-      ctx.fillStyle = C.mute
-      ctx.font = '9px "JetBrains Mono Variable", monospace'
-      ctx.fillText('MALL RD', 14, ROADS_H[0] - 4)
-      ctx.fillText('STATION RD', 14, ROADS_H[2] - 4)
-      ctx.save(); ctx.translate(ROADS_V[2] + 4, 30); ctx.rotate(Math.PI / 2); ctx.fillText('CIVIL LINES', 0, 0); ctx.restore()
-
-      // nearest-first ghost lines
-      if (F.showGreedy) {
-        ctx.setLineDash([3, 6]); ctx.strokeStyle = C.ink + '70'; ctx.lineWidth = 1.3
-        greedyPairs.forEach(([v, tk]) => { if (tk.state !== 'open') return; ctx.beginPath(); ctx.moveTo(v.x, v.y); ctx.lineTo(tk.x, tk.y); ctx.stroke() })
-        ctx.setLineDash([])
-      }
-      // assignment lines: solid ahead of the volunteer
+      // drive along the route
       vols.forEach((v) => {
         const tk = v.task
-        if (!tk || tk.state !== 'open') return
-        ctx.strokeStyle = C.signal + 'aa'; ctx.lineWidth = 2
-        ctx.setLineDash([8, 6]); ctx.lineDashOffset = -t * 30
-        ctx.beginPath(); ctx.moveTo(v.x, v.y); ctx.lineTo(tk.x, tk.y); ctx.stroke()
+        if (tk && tk.state === 'open' && v.path.length) {
+          let left = SPEED * dt
+          while (left > 0 && v.path.length) {
+            const [nx, ny] = v.path[0]
+            const L = Math.hypot(nx - v.x, ny - v.y)
+            if (L <= left) { v.x = nx; v.y = ny; v.path.shift(); left -= L } else { v.x += ((nx - v.x) / L) * left; v.y += ((ny - v.y) / L) * left; left = 0 }
+          }
+          v.pos = snap(v.x, v.y)
+          v.trail.push([v.x, v.y, simT])
+          if (!v.path.length) { tk.state = 'verifying'; tk.t0 = simT; patchFeed(tk.id, { status: 'verifying' }) }
+        }
+        v.trail = v.trail.filter((p) => simT - p[2] < 1.6)
+      })
+      // check the proof photo, then close the task
+      tasks.forEach((tk) => {
+        if (tk.state === 'verifying' && simT - tk.t0 > 1.6) {
+          tk.state = 'resolved'; tk.t0 = simT; resolved++; respSum += simT - tk.born
+          patchFeed(tk.id, { status: 'resolved' })
+          if (tk.vol) { tk.vol.task = null; tk.vol = null }
+          setClosures()
+          reassign()
+        }
+      })
+      for (let i = tasks.length - 1; i >= 0; i--) if (tasks[i].state === 'resolved' && simT - tasks[i].t0 > 1.2) tasks.splice(i, 1)
+    }
+
+    const polyline = (pts) => { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke() }
+
+    const draw = (t) => {
+      const v = view.current, k = v.k
+      const sx = W / MW, sy = H / MH
+      ctx.setTransform(dpr * sx * k, 0, 0, dpr * sy * k, dpr * sx * v.tx, dpr * sy * v.ty)
+      drawMap(ctx, dark, closed, k)
+
+      // nearest-first routes, ghosted
+      if (flags.current.showGreedy) {
+        ctx.setLineDash([3 / k, 5 / k]); ctx.strokeStyle = C.ink + '80'; ctx.lineWidth = 1.6 / k
+        greedyRoutes.forEach((g) => g.t.state === 'open' && polyline(g.pts))
+        ctx.setLineDash([])
+      }
+      // assigned routes: road-following, marching dashes
+      vols.forEach((vo) => {
+        if (!vo.task || vo.task.state !== 'open' || !vo.path.length) return
+        ctx.strokeStyle = C.signal + 'b0'; ctx.lineWidth = 3 / k
+        ctx.setLineDash([7 / k, 5 / k]); ctx.lineDashOffset = -t * 26 / k
+        polyline([[vo.x, vo.y], ...vo.path])
         ctx.setLineDash([]); ctx.lineDashOffset = 0
       })
       // trails
-      vols.forEach((v) => {
-        for (let i = 1; i < v.trail.length; i++) {
-          const a = v.trail[i - 1], b = v.trail[i]
-          ctx.strokeStyle = C.signal + Math.round(255 * (1 - (simT - b[2]) / 1.6) * 0.5).toString(16).padStart(2, '0')
-          ctx.lineWidth = 3
+      vols.forEach((vo) => {
+        for (let i = 1; i < vo.trail.length; i++) {
+          const a = vo.trail[i - 1], b = vo.trail[i]
+          ctx.strokeStyle = C.signal + hex((1 - (simT - b[2]) / 1.6) * 0.5)
+          ctx.lineWidth = 4 / k
           ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke()
         }
       })
       // incidents
+      const u = 1 / Math.sqrt(k)
       tasks.forEach((tk) => {
         const age = simT - tk.t0
         if (tk.state === 'incoming') {
-          const k = Math.min(1, age / 1.4)
-          ctx.strokeStyle = C.signal; ctx.lineWidth = 1.5; ctx.globalAlpha = 1 - k
-          ctx.beginPath(); ctx.arc(tk.x, tk.y, 40 * (1 - k) + 6, 0, 7); ctx.stroke(); ctx.globalAlpha = 1
+          const q = Math.min(1, age / 1.4)
+          ctx.strokeStyle = C.signal; ctx.lineWidth = 1.5 / k; ctx.globalAlpha = 1 - q
+          ctx.beginPath(); ctx.arc(tk.x, tk.y, (40 * (1 - q) + 6) * u, 0, 7); ctx.stroke(); ctx.globalAlpha = 1
           return
         }
-        const fade = tk.state === 'resolved' ? Math.max(0, 1 - age / 1.2) : 1
-        ctx.globalAlpha = fade
+        ctx.globalAlpha = tk.state === 'resolved' ? Math.max(0, 1 - age / 1.2) : 1
         const hot = tk.urg === 'high'
         if (tk.state === 'open' && !reduced) {
           const ph = ((t + tk.id * 0.37) % 2.2) / 2.2
-          ctx.strokeStyle = (hot ? C.signal : C.ink) + Math.round((1 - ph) * 120).toString(16).padStart(2, '0')
-          ctx.lineWidth = 1.5
-          ctx.beginPath(); ctx.arc(tk.x, tk.y, 12 + ph * 26, 0, 7); ctx.stroke()
+          ctx.strokeStyle = (hot ? C.signal : C.ink) + hex((1 - ph) * 0.5)
+          ctx.lineWidth = 1.5 / k
+          ctx.beginPath(); ctx.arc(tk.x, tk.y, (10 + ph * 24) * u, 0, 7); ctx.stroke()
         }
-        // pin
+        const pinR = 9.5 * u
         ctx.fillStyle = tk.state === 'resolved' ? C.mute : hot ? C.signal : C.ink
-        ctx.beginPath(); ctx.moveTo(tk.x, tk.y + 2); ctx.arc(tk.x, tk.y - 12, 10, Math.PI * 0.8, Math.PI * 2.2); ctx.closePath(); ctx.fill()
+        ctx.beginPath(); ctx.moveTo(tk.x, tk.y); ctx.arc(tk.x, tk.y - pinR * 1.25, pinR, Math.PI * 0.78, Math.PI * 2.22); ctx.closePath(); ctx.fill()
         ctx.fillStyle = C.paper
-        ctx.font = '700 10px "JetBrains Mono Variable", monospace'
+        ctx.font = `700 ${10 * u}px "JetBrains Mono Variable", monospace`
         ctx.textAlign = 'center'
-        ctx.fillText(tk.state === 'resolved' ? '✓' : String(tk.id), tk.x, tk.y - 8.5)
+        ctx.fillText(tk.state === 'resolved' ? '✓' : tk.kind === 'debris clearing' ? '!' : String(tk.id), tk.x, tk.y - pinR * 0.85)
         if (tk.state === 'verifying') {
-          ctx.strokeStyle = C.signal; ctx.lineWidth = 2
+          ctx.strokeStyle = C.signal; ctx.lineWidth = 2 / k
           const a = t * 6
-          ctx.beginPath(); ctx.arc(tk.x, tk.y - 12, 15, a, a + 4); ctx.stroke()
+          ctx.beginPath(); ctx.arc(tk.x, tk.y - pinR * 1.25, pinR * 1.5, a, a + 4); ctx.stroke()
         }
-        ctx.fillStyle = C.mute
-        ctx.font = '9px "JetBrains Mono Variable", monospace'
-        ctx.fillText(tk.kind, tk.x, tk.y + 14)
-        ctx.textAlign = 'left'
         ctx.globalAlpha = 1
       })
-      // volunteers
-      vols.forEach((v) => {
-        const busy = v.task && v.task.state !== 'resolved'
+      // volunteers: little vehicles with an id
+      vols.forEach((vo) => {
+        const busy = vo.task && vo.task.state !== 'resolved'
+        const r = 10 * u
         ctx.fillStyle = C.paper
-        ctx.strokeStyle = busy ? C.signal : C.ink + '66'
-        ctx.lineWidth = 2.4
-        ctx.beginPath(); ctx.arc(v.x, v.y, 11, 0, 7); ctx.fill(); ctx.stroke()
+        ctx.strokeStyle = busy ? C.signal : C.ink + '88'
+        ctx.lineWidth = 2.4 * u
+        ctx.beginPath(); ctx.arc(vo.x, vo.y, r, 0, 7); ctx.fill(); ctx.stroke()
         ctx.fillStyle = C.ink
-        ctx.font = '600 10px "JetBrains Mono Variable", monospace'
+        ctx.font = `600 ${9.5 * u}px "JetBrains Mono Variable", monospace`
         ctx.textAlign = 'center'
-        ctx.fillText(`V${v.id}`, v.x, v.y + 3.5)
-        ctx.textAlign = 'left'
+        ctx.fillText(`V${vo.id}`, vo.x, vo.y + 3.3 * u)
       })
+      ctx.textAlign = 'left'
+
+      // screen-space overlay: scale bar and compass
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      const unitPx = sx * k * (500 / M_PER_UNIT) // 500 m on screen
+      ctx.fillStyle = dark ? 'rgba(20,20,22,0.8)' : 'rgba(255,255,255,0.82)'
+      ctx.beginPath(); ctx.roundRect(10, H - 26, unitPx + 52, 18, 4); ctx.fill()
+      ctx.strokeStyle = C.ink; ctx.lineWidth = 1.2
+      ctx.beginPath(); ctx.moveTo(16, H - 13); ctx.lineTo(16, H - 17); ctx.moveTo(16, H - 15); ctx.lineTo(16 + unitPx, H - 15); ctx.moveTo(16 + unitPx, H - 13); ctx.lineTo(16 + unitPx, H - 17); ctx.stroke()
+      ctx.fillStyle = C.ink
+      ctx.font = '500 9.5px "JetBrains Mono Variable", monospace'
+      ctx.fillText('500 m', 22 + unitPx, H - 13)
+      const cx = W - 24, cy = H - 26
+      ctx.fillStyle = dark ? 'rgba(20,20,22,0.8)' : 'rgba(255,255,255,0.82)'
+      ctx.beginPath(); ctx.arc(cx, cy, 13, 0, 7); ctx.fill()
+      ctx.fillStyle = C.signal
+      ctx.beginPath(); ctx.moveTo(cx, cy - 9); ctx.lineTo(cx + 4, cy + 1); ctx.lineTo(cx - 4, cy + 1); ctx.fill()
+      ctx.fillStyle = C.ink + '70'
+      ctx.beginPath(); ctx.moveTo(cx, cy + 9); ctx.lineTo(cx + 4, cy + 1); ctx.lineTo(cx - 4, cy + 1); ctx.fill()
+      ctx.fillStyle = C.ink
+      ctx.font = '700 8px "JetBrains Mono Variable", monospace'
+      ctx.textAlign = 'center'
+      ctx.fillText('N', cx, cy - 13.5 + 0.5 - 2)
+      ctx.textAlign = 'left'
+    }
+
+    const frame = (now) => {
       raf = requestAnimationFrame(frame)
+      const dt = Math.min(0.05, (now - prev) / 1000)
+      prev = now
+      if (!visible) return
+      if (!flags.current.paused && !reduced) step(dt)
+      draw(now / 1000)
     }
     raf = requestAnimationFrame(frame)
-    return () => { cancelAnimationFrame(raf); ro.disconnect(); offTheme() }
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); io.disconnect(); offTheme() }
   }, [])
 
-  // pointer: drag volunteers, click incidents for detail, click empty map to file a report
-  const dragV = useRef(null)
-  const moved = useRef(false)
+  // pointer: drag a volunteer, click an incident or volunteer for detail, drag the map to pan, click the map to file a report
+  const gesture = useRef(null)
   const toMap = (e) => {
     const r = canvas.current.getBoundingClientRect()
-    return [((e.clientX - r.left) / r.width) * MW, ((e.clientY - r.top) / r.height) * MH, r]
+    const v = view.current
+    const mx = ((e.clientX - r.left) / r.width) * MW, my = ((e.clientY - r.top) / r.height) * MH
+    return { x: (mx - v.tx) / v.k, y: (my - v.ty) / v.k, mx, my }
+  }
+  const panelAt = (x, y) => {
+    const v = view.current
+    return { left: ((x * v.k + v.tx) / MW) * 100, top: Math.min(52, ((y * v.k + v.ty) / MH) * 100 + 4) }
   }
   const down = (e) => {
-    const [x, y] = toMap(e)
-    const h = api.current.hit?.(x, y)
-    moved.current = false
-    if (h?.kind === 'v') { dragV.current = h.v; e.currentTarget.setPointerCapture(e.pointerId) }
-    else if (h?.kind === 't') setSel({ t: { ...h.t, vol: h.t.vol?.id }, left: (x / MW) * 100, top: Math.min(52, (y / MH) * 100 + 4) })
-    else { api.current.report?.(x, y); setSel(null) }
+    if (e.target !== canvas.current) return
+    const p = toMap(e)
+    const h = api.current.hit?.(p.x, p.y)
+    gesture.current = { h, start: p, last: p, moved: false }
+    e.currentTarget.setPointerCapture(e.pointerId)
   }
   const move = (e) => {
-    if (!dragV.current) return
-    moved.current = true
-    const [x, y] = toMap(e)
-    api.current.drag(dragV.current, x, y)
+    const g = gesture.current
+    if (!g) return
+    const p = toMap(e)
+    if (Math.hypot(p.mx - g.start.mx, p.my - g.start.my) > 4) g.moved = true
+    if (!g.moved) return
+    if (g.h?.kind === 'v') api.current.drag(g.h.v, p.x, p.y)
+    else api.current.pan(p.mx - g.last.mx, p.my - g.last.my)
+    g.last = p
   }
   const up = () => {
-    if (dragV.current) {
-      const v = dragV.current
-      if (moved.current) api.current.dropped()
-      else setSel({ v: { id: v.id, task: v.task ? { id: v.task.id, kind: v.task.kind } : null, dist: v.task ? Math.round(d([v.x, v.y], [v.task.x, v.task.y])) : 0 }, left: (v.x / MW) * 100, top: Math.min(52, (v.y / MH) * 100 + 4) })
+    const g = gesture.current
+    gesture.current = null
+    if (!g) return
+    if (g.h?.kind === 'v') {
+      const v = g.h.v
+      if (g.moved) api.current.dropped(v)
+      else setSel({ v: { id: v.id, task: v.task ? { id: v.task.id, kind: v.task.kind } : null, left: v.path.reduce((s, q, i, arr) => s + Math.hypot(q[0] - (i ? arr[i - 1][0] : v.x), q[1] - (i ? arr[i - 1][1] : v.y)), 0) }, ...panelAt(v.x, v.y) })
+    } else if (g.h?.kind === 't') {
+      if (!g.moved) setSel({ t: { ...g.h.t, vol: g.h.t.vol?.id, linked: api.current.linked(g.h.t) }, ...panelAt(g.h.t.x, g.h.t.y) })
+    } else if (!g.moved) {
+      api.current.report?.(g.start.x, g.start.y)
+      setSel(null)
     }
-    dragV.current = null
   }
 
-  const STATUS = { extracting: 'extracting', open: 'on the map', waiting: 'waiting for a volunteer', assigned: 'assigned', verifying: 'on site, checking proof photo', resolved: 'resolved' }
+  const STATUS = { extracting: 'reading the photo', open: 'on the map', waiting: 'waiting for a volunteer', assigned: 'assigned', verifying: 'on site, checking proof photo', resolved: 'resolved' }
+  const ctl = 'grid h-8 w-8 place-items-center rounded-md border border-ink/15 bg-paper/90 font-mono text-[15px] leading-none text-ink shadow-sm backdrop-blur transition-colors hover:border-ink/40 disabled:opacity-40'
 
   return (
     <Device
@@ -353,34 +410,41 @@ export default function OpsRoom() {
           <button onClick={() => setPaused((p) => !p)} aria-pressed={paused} className="rounded-full border border-ink/20 px-3 py-1.5 font-mono text-[12px] transition-colors hover:border-ink">{paused ? 'resume' : 'pause'}</button>
           <button onClick={() => api.current.addVol?.()} className="rounded-full border border-ink/20 px-3 py-1.5 font-mono text-[12px] transition-colors hover:border-ink">add volunteer</button>
           <label className="flex items-center gap-2.5 font-mono text-[12px] text-ink-2">
-            <Toggle on={showGreedy} onChange={setShowGreedy} label="Show nearest-first" /> nearest-first
+            <Toggle on={showGreedy} onChange={setShowGreedy} label="Show nearest-first routes" /> nearest-first
           </label>
-          <div className="ml-auto flex items-baseline gap-5">
+          <div className="ml-auto flex flex-wrap items-baseline gap-x-5 gap-y-1">
             <Stat label="open">{stats.open}</Stat>
+            <Stat label="roads closed" accent={stats.closed > 0}>{stats.closed}</Stat>
             <Stat label="resolved"><Tween value={stats.resolved} /></Stat>
             <Stat label="avg response"><Tween value={stats.avg} format={(v) => `${v.toFixed(1)} s`} /></Stat>
-            <Stat label="nearest-first wastes" accent><Tween value={stats.waste} format={(v) => `${v.toFixed(1)}%`} /></Stat>
+            <Stat label="nearest-first drives" accent><Tween value={stats.waste} format={(v) => `+${v.toFixed(1)}%`} /></Stat>
           </div>
         </>
       }
       footer={
         <>
-          <span>click the map to file a report</span>
-          <span>drag a volunteer to move them</span>
-          <span className="ml-auto">assignment re-solved on every change</span>
+          <span>click a road to file a report</span>
+          <span>drag the map to pan, drag a volunteer to move them</span>
+          <span className="ml-auto">routes re-solved on every change</span>
         </>
       }
     >
       <div className="grid md:grid-cols-[minmax(0,1fr)_270px]">
         <div
           ref={wrap}
-          className="relative aspect-[760/420] w-full touch-none select-none"
+          className={`relative aspect-[760/420] w-full touch-none select-none overflow-hidden ${zoom > 1 ? 'cursor-grab active:cursor-grabbing' : ''}`}
           onPointerDown={down}
           onPointerMove={move}
           onPointerUp={up}
-          data-cursor="snap"
+          onPointerCancel={() => (gesture.current = null)}
+          data-cursor
         >
-          <canvas ref={canvas} className="absolute inset-0 h-full w-full" role="img" aria-label="City map with incidents and volunteers moving to them" />
+          <canvas ref={canvas} className="absolute inset-0 h-full w-full" role="img" aria-label="Street map with incidents, closed roads and volunteers driving to them" />
+          <div className="absolute right-2.5 top-2.5 flex flex-col gap-1.5">
+            <button className={ctl} aria-label="Zoom in" disabled={zoom >= 3} onClick={() => api.current.zoomAt(view.current.k * 1.5)}>+</button>
+            <button className={ctl} aria-label="Zoom out" disabled={zoom <= 1} onClick={() => api.current.zoomAt(view.current.k / 1.5)}>−</button>
+            <button className={`${ctl} text-[11px]`} aria-label="Reset view" disabled={zoom <= 1} onClick={() => api.current.zoomAt(1)}>⌂</button>
+          </div>
           <Panel
             open={!!sel}
             onClose={closeSel}
@@ -389,18 +453,25 @@ export default function OpsRoom() {
             title={sel?.t ? `incident ${sel.t.id}, ${sel.t.kind}` : sel?.v ? `volunteer V${sel.v.id}` : ''}
             rows={
               sel?.t
-                ? [['urgency', sel.t.urg], ['people', String(sel.t.people)], ['area', sel.t.sector], ['assigned', sel.t.vol ? `V${sel.t.vol}` : 'waiting']]
+                ? [
+                    ['urgency', sel.t.urg],
+                    ['people', String(sel.t.people)],
+                    ['area', sel.t.where],
+                    ['assigned', sel.t.vol ? `V${sel.t.vol}` : 'waiting'],
+                    ...(sel.t.kind === 'debris clearing' ? [['road', 'closed until cleared'], ['linked incidents', sel.t.linked.length ? sel.t.linked.join(', ') : 'none nearby']] : []),
+                  ]
                 : sel?.v
-                  ? [['heading to', sel.v.task ? `incident ${sel.v.task.id}, ${sel.v.task.kind}` : 'standing by'], ['distance left', sel.v.task ? String(sel.v.dist) : '0']]
+                  ? [['heading to', sel.v.task ? `incident ${sel.v.task.id}, ${sel.v.task.kind}` : 'standing by'], ['road distance left', km(sel.v.left)]]
                   : []
             }
           />
         </div>
 
         {/* field reports */}
-        <div className="border-t border-rule md:border-l md:border-t-0">
+        <div className="relative border-t border-rule md:border-l md:border-t-0">
+          <div className="md:absolute md:inset-0 md:flex md:flex-col">
           <p className="border-b border-rule px-4 py-2.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-mute">Field reports</p>
-          <ul className="max-h-[420px] overflow-hidden">
+          <ul className="max-h-[420px] overflow-hidden md:max-h-none md:flex-1 md:[mask-image:linear-gradient(to_bottom,#000_85%,transparent)]">
             <AnimatePresence initial={false}>
               {feed.map((r) => (
                 <motion.li
@@ -417,7 +488,7 @@ export default function OpsRoom() {
                     <span className={`font-mono text-[10px] uppercase tracking-wider ${r.urg === 'high' ? 'text-signal' : 'text-mute'}`}>{r.urg}</span>
                   </div>
                   <dl className="mt-1.5 grid grid-cols-[52px_1fr] gap-y-0.5 font-mono text-[11px]">
-                    {[['need', r.kind], ['people', r.people], ['where', r.sector]].map(([k, v], i) => (
+                    {[['need', r.kind], ['people', r.people], ['where', r.where]].map(([k, v], i) => (
                       <motion.div key={k} className="contents" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 + i * 0.35 }}>
                         <dt className="text-mute">{k}</dt>
                         <dd>{v}</dd>
@@ -426,25 +497,16 @@ export default function OpsRoom() {
                   </dl>
                   <AnimatePresence mode="wait">
                     <motion.p key={r.status} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={`mt-1.5 font-mono text-[11px] ${r.status === 'resolved' ? 'text-ink' : r.status === 'verifying' || r.status === 'assigned' ? 'text-signal' : 'text-mute'}`}>
-                      {r.status === 'resolved' ? '✓ ' : ''}{STATUS[r.status]}{r.vol && r.status === 'assigned' ? `, V${r.vol} en route` : ''}
+                      {r.status === 'resolved' ? '✓ ' : ''}{STATUS[r.status]}{r.vol && r.status === 'assigned' ? `, V${r.vol} en route` : ''}{r.kind === 'debris clearing' && r.status !== 'resolved' && r.status !== 'extracting' ? ', road closed' : ''}
                     </motion.p>
                   </AnimatePresence>
                 </motion.li>
               ))}
             </AnimatePresence>
           </ul>
+          </div>
         </div>
       </div>
     </Device>
   )
-}
-
-function rr(ctx, x, y, w, h, r) {
-  ctx.beginPath()
-  ctx.moveTo(x + r, y)
-  ctx.arcTo(x + w, y, x + w, y + h, r)
-  ctx.arcTo(x + w, y + h, x, y + h, r)
-  ctx.arcTo(x, y + h, x, y, r)
-  ctx.arcTo(x, y, x + w, y, r)
-  ctx.closePath()
 }

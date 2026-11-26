@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Device, Seg, Tween } from '../kit'
 
-// Fig. 7, real numbers: AETHER evaluation run, 9 prompts × 6 strategies
+// AETHER leaderboard, real numbers: AETHER evaluation run, 9 prompts × 6 strategies
 // (aether/backend/eval_results/latest_summary.md).
 const ROWS = [
   { s: 'Greedy decoding', ppl: 1539.82, bleu: 32.89, rouge: 0.761 },
@@ -55,7 +55,6 @@ export default function MetricRank() {
           <button
             onClick={() => setOpen(open === r.s ? null : r.s)}
             aria-expanded={open === r.s}
-            data-cursor-label={open === r.s ? 'close' : 'all scores'}
             className="relative grid w-full grid-cols-[30px_minmax(0,1fr)_76px] items-center gap-x-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-ink/[0.03] md:grid-cols-[30px_230px_minmax(0,1fr)_84px]"
           >
             <span className={`font-mono text-[12px] ${i === 0 ? 'text-signal' : 'text-mute'}`}>#{i + 1}</span>

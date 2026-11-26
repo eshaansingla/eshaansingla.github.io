@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { animate, motion } from 'framer-motion'
 import { Device, EASE, Panel, Seg, Stat, Toggle, Tween } from '../kit'
 
-// Fig. 3, the filter, in frequency and in time. Drag the cutoff on the spectrum; the trace morphs.
+// Pran zero-phase filter, the filter, in frequency and in time. Drag the cutoff on the spectrum; the trace morphs.
 const FS = 50
 const N = 400
 const gauss = (x, m, s) => Math.exp(-((x - m) ** 2) / (2 * s * s))
@@ -150,7 +150,7 @@ export default function FilterToy() {
         <>
           <Seg label="Filter" value={mode} onChange={setMode} options={[['single', 'one pass'], ['zero', 'forward + backward']]} />
           <label className="flex items-center gap-2 font-mono text-[12px] text-mute">
-            <Toggle on={showRaw} onChange={setShowRaw} label="Show raw signal" cursorLabel={showRaw ? 'hide raw' : 'show raw'} /> raw
+            <Toggle on={showRaw} onChange={setShowRaw} label="Show raw signal" /> raw
           </label>
           <div className="ml-auto flex flex-wrap items-baseline gap-x-5">
             <Stat label="cutoff"><Tween value={fc} format={(v) => `${v.toFixed(2)} Hz`} duration={0.3} /></Stat>
@@ -180,8 +180,7 @@ export default function FilterToy() {
         aria-valuetext={`${fc.toFixed(2)} hertz`}
         onKeyDown={onKey}
         className="relative touch-none select-none border-b border-rule outline-none focus-visible:bg-signal/[0.04]"
-        data-cursor="drag"
-        data-cursor-label={hoverF != null ? `${hoverF.toFixed(1)} Hz, keeps ${Math.round(resp(hoverF) * 100)}%` : 'drag the cutoff'}
+        data-cursor
         onPointerDown={(e) => { dragging.current = true; e.currentTarget.setPointerCapture(e.pointerId); setFrom(e) }}
         onPointerMove={(e) => {
           const r = strip.current.getBoundingClientRect()
@@ -231,7 +230,7 @@ export default function FilterToy() {
       </div>
 
       {/* time domain: click to inspect a sample */}
-      <div className="relative" onClick={pickAt} data-cursor="probe" data-cursor-label="inspect sample">
+      <div className="relative" onClick={pickAt} data-cursor>
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="paper-grid block h-[200px] w-full md:h-[230px]" role="img" aria-label="Noisy pulse, true pulse and filtered output">
           {showRaw && <path d={path(raw)} fill="none" className="stroke-ink" strokeOpacity=".18" strokeWidth="1" vectorEffect="non-scaling-stroke" />}
           <path d={path(clean)} fill="none" className="stroke-ink" strokeDasharray="3 4" strokeOpacity=".55" strokeWidth="1.2" vectorEffect="non-scaling-stroke" />

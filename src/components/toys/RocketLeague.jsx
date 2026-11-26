@@ -204,8 +204,7 @@ export default function RocketLeague() {
                   initial={false}
                   animate={{ left: `${pos(v)}%` }}
                   transition={{ type: 'spring', stiffness: 140, damping: 20 }}
-                  data-cursor="snap"
-                  data-cursor-label={`${label}, ${v}`}
+                  data-cursor
                   tabIndex={0}
                   aria-label={`${label} ${v}`}
                 >
@@ -226,7 +225,6 @@ export default function RocketLeague() {
                 <button
                   key={s.k}
                   onClick={() => setSel(sel === s.k ? null : s.k)}
-                  data-cursor-label={`${s.k}, details`}
                   className={`rounded-xl border p-3 text-left transition-colors ${sel === s.k ? 'border-signal bg-signal/[0.06]' : 'border-rule hover:border-ink/40'}`}
                 >
                   <span className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.12em] text-mute">

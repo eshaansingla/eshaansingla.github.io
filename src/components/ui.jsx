@@ -26,7 +26,6 @@ export function Cite({ n }) {
       href={r.href}
       target="_blank"
       rel="noreferrer"
-      data-cursor-label={`[${n}] ${r.label} ↗`}
       className="group relative ml-0.5 font-mono text-[0.68em] text-signal no-underline hover:underline"
       aria-label={`Reference ${n}: ${r.label}`}
     >

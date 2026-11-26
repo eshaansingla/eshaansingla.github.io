@@ -1,0 +1,129 @@
+import { motion } from 'framer-motion'
+import { refs } from '../data'
+import { EASE, useSeen } from './kit'
+
+/** Body row: main text column + margin note (sidenote on wide screens, inline note on small). */
+export function Row({ children, note, className = '' }) {
+  return (
+    <div className={`mx-auto grid max-w-[1040px] gap-x-12 px-5 md:px-8 xl:grid-cols-[660px_1fr] ${className}`}>
+      <div>{children}</div>
+      {note ? (
+        <aside className="mt-3 border-l border-signal/60 pl-3 font-mono text-[12px] leading-[1.6] text-mute xl:mt-1.5">{note}</aside>
+      ) : (
+        <div className="hidden xl:block" />
+      )}
+    </div>
+  )
+}
+
+export const Num = ({ children }) => <span className="num">{children}</span>
+
+/** Inline citation with a hover card. */
+export function Cite({ n }) {
+  const r = refs[n]
+  return (
+    <a
+      href={r.href}
+      target="_blank"
+      rel="noreferrer"
+      data-cursor-label={`[${n}] ${r.label} ↗`}
+      className="group relative ml-0.5 font-mono text-[0.68em] text-signal no-underline hover:underline"
+      aria-label={`Reference ${n}: ${r.label}`}
+    >
+      [{n}]
+      <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden w-60 -translate-x-1/2 translate-y-1 rounded-lg border border-ink/15 bg-canvas p-3 text-left font-mono text-[11px] leading-snug text-ink opacity-0 shadow-[0_12px_32px_-12px_rgb(0_0_0/0.35)] transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100 md:block">
+        <span className="block text-signal">[{n}] {r.label}</span>
+        <span className="mt-1 block text-ink-2">{r.text}</span>
+      </span>
+    </a>
+  )
+}
+
+export function H2({ id, n, children }) {
+  const [ref, seen] = useSeen('-60px')
+  return (
+    <Row className="mb-6 mt-24 md:mt-32">
+      <div ref={ref} className="relative pt-4">
+        <motion.span
+          className="absolute left-0 top-0 h-px w-full origin-left bg-ink"
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: seen ? 1 : 0 }}
+          transition={{ duration: 1.1, ease: EASE }}
+        />
+        <h2 id={id} className="flex items-baseline gap-5 text-[2rem] font-medium leading-tight tracking-[-0.015em] md:text-[2.4rem]">
+          <motion.span
+            className="font-mono text-[0.45em] font-normal text-signal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: seen ? 1 : 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
+            {n}
+          </motion.span>
+          <motion.span
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: seen ? 1 : 0, y: seen ? 0 : 14 }}
+            transition={{ duration: 0.8, ease: EASE, delay: 0.1 }}
+          >
+            {children}
+          </motion.span>
+        </h2>
+      </div>
+    </Row>
+  )
+}
+
+export function H3({ id, n, children, meta }) {
+  return (
+    <Row className="mb-3 mt-16" note={meta}>
+      <h3 id={id} className="text-[1.45rem] font-medium leading-snug tracking-[-0.01em]">
+        <span className="mr-3 font-mono text-[0.6em] text-mute">{n}</span>
+        {children}
+      </h3>
+    </Row>
+  )
+}
+
+export function P({ children, note }) {
+  return (
+    <Row note={note} className="mb-4">
+      <p className="prose-p">{children}</p>
+    </Row>
+  )
+}
+
+/**
+ * Figure plate. On first view a signal-coloured line traces the plate's outline, then the
+ * contents rise in. Controls sit in a toolbar; caption is numbered like a paper.
+ */
+export function Figure({ id, n, caption, children }) {
+  const [ref, seen] = useSeen('-120px')
+  return (
+    <figure id={id} className="mx-auto my-12 max-w-[1040px] px-5 md:px-8">
+      <div ref={ref} className="relative">
+        <motion.div
+          className="relative"
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: seen ? 1 : 0, y: seen ? 0 : 18 }}
+          transition={{ duration: 0.9, ease: EASE, delay: 0.15 }}
+        >
+          {children}
+        </motion.div>
+        {/* outline trace */}
+        <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" aria-hidden="true">
+          <motion.rect
+            x="0.5" y="0.5" rx="16"
+            style={{ width: 'calc(100% - 1px)', height: 'calc(100% - 1px)' }}
+            fill="none" className="stroke-signal" strokeWidth="1.5"
+            initial={{ pathLength: 0, opacity: 1 }}
+            animate={seen ? { pathLength: 1, opacity: [1, 1, 0] } : {}}
+            transition={{ pathLength: { duration: 1.2, ease: EASE }, opacity: { duration: 1.9, times: [0, 0.65, 1] } }}
+          />
+        </svg>
+      </div>
+      <figcaption className="mt-3.5 grid gap-x-6 gap-y-1 text-[15px] leading-snug sm:grid-cols-[72px_1fr] xl:grid-cols-[72px_588px]">
+        <span className="font-mono text-[12px] uppercase tracking-wider text-signal">Fig. {n}</span>
+        <span className="italic text-ink-2">{caption}</span>
+      </figcaption>
+    </figure>
+  )
+}

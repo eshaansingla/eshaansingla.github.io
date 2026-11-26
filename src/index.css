@@ -1,0 +1,111 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --canvas: #f6f5f0;
+  --paper: #fbfaf6;
+  --ink: #121212;
+  --ink-2: #3b3a36;
+  --mute: #75726a;
+  --rule: #e1dfd6;
+  --rule-2: #ccc8bc;
+  --signal: #e04f16;
+  --signal-ink: #ffffff;
+  --grid: rgb(18 18 18 / 0.05);
+  color-scheme: light;
+}
+.dark {
+  --canvas: #121211;
+  --paper: #191917;
+  --ink: #ecebe4;
+  --ink-2: #c4c2b9;
+  --mute: #8d8a80;
+  --rule: #2a2926;
+  --rule-2: #3d3c37;
+  --signal: #ff6a2c;
+  --signal-ink: #120a05;
+  --grid: rgb(236 235 228 / 0.05);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-mute: var(--mute);
+  --color-rule: var(--rule);
+  --color-rule-2: var(--rule-2);
+  --color-signal: var(--signal);
+  --color-signal-ink: var(--signal-ink);
+
+  --font-serif: 'Newsreader Variable', Georgia, 'Times New Roman', serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@layer base {
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; overflow-x: clip; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    @apply bg-canvas text-ink font-serif antialiased;
+    font-size: 19px;
+    line-height: 1.6;
+    font-optical-sizing: auto;
+  }
+  ::selection { background: var(--signal); color: var(--signal-ink); }
+  :focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
+  [id] { scroll-margin-top: 84px; }
+
+  /* custom cursor replaces the native one only on fine pointers */
+  html.has-cursor, html.has-cursor * { cursor: none !important; }
+  html.has-cursor input[type='text'], html.has-cursor input:not([type]), html.has-cursor textarea { cursor: text !important; }
+
+  /* range inputs: hairline track, square thumb */
+  input[type='range'] {
+    -webkit-appearance: none; appearance: none; background: transparent; height: 28px;
+  }
+  input[type='range']::-webkit-slider-runnable-track { height: 1px; background: var(--ink); }
+  input[type='range']::-moz-range-track { height: 1px; background: var(--ink); }
+  input[type='range']::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px; margin-top: -7px;
+    background: var(--signal); border: 2px solid var(--canvas); outline: 1px solid var(--signal);
+    transition: transform 0.15s;
+  }
+  input[type='range']:active::-webkit-slider-thumb { transform: scale(1.3); }
+  input[type='range']::-moz-range-thumb {
+    width: 12px; height: 12px; border-radius: 0; background: var(--signal); border: 2px solid var(--canvas);
+  }
+}
+
+/* theme switch: circular reveal */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+
+@layer components {
+  .prose-p { @apply text-ink-2; hyphens: auto; }
+  .smallcaps { font-variant-caps: all-small-caps; letter-spacing: 0.06em; }
+  .num {
+    @apply font-mono whitespace-nowrap text-ink;
+    font-size: 0.8em;
+    border-bottom: 1px solid color-mix(in srgb, var(--signal) 60%, transparent);
+  }
+  .ctrl {
+    @apply inline-flex min-h-9 items-center gap-1.5 border border-ink/25 px-3 font-mono text-[12px] leading-none transition-colors select-none;
+  }
+  .ctrl:hover { @apply border-ink; }
+  .ctrl[aria-pressed='true'] { @apply border-ink bg-ink text-canvas; }
+  .ctrl-signal { @apply border-signal bg-signal text-signal-ink; }
+  .ctrl-signal:hover { @apply border-ink bg-ink text-canvas; }
+  .paper-grid {
+    background-image:
+      linear-gradient(to right, var(--grid) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+  .switch { @apply relative inline-flex h-5 w-9 shrink-0 items-center border border-ink transition-colors; }
+  .switch > span { @apply absolute left-0.5 h-3.5 w-3.5 bg-ink transition-transform duration-200; }
+  .switch[aria-checked='true'] { @apply border-signal bg-signal; }
+  .switch[aria-checked='true'] > span { @apply translate-x-4 bg-signal-ink; }
+}
+
+@keyframes sweep { from { left: 0%; } to { left: 100%; } }

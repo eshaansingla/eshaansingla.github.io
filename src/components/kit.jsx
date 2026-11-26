@@ -144,17 +144,12 @@ function Clock() {
   return <span className="tabular-nums">{t} IST</span>
 }
 
-/** Status light: live (pulsing), run (fast), idle (static), down. */
+/** Status label (text only). Running states get a soft breathing opacity. */
 export function LiveDot({ status = 'live', label }) {
-  const color = status === 'down' ? 'bg-ink/30' : status === 'idle' ? 'bg-ink/40' : 'bg-signal'
   return (
-    <span className="inline-flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.12em] text-mute">
-      <span className="relative flex h-2 w-2">
-        {(status === 'live' || status === 'run') && (
-          <span className={`absolute inset-0 rounded-full ${color} opacity-60 motion-safe:animate-ping`} style={{ animationDuration: status === 'run' ? '0.7s' : '1.6s' }} />
-        )}
-        <span className={`relative h-2 w-2 rounded-full ${color}`} />
-      </span>
+    <span
+      className={`inline-flex items-center font-mono text-[10.5px] uppercase tracking-[0.14em] ${status === 'down' || status === 'idle' ? 'text-mute' : 'text-signal'} ${status === 'run' ? 'motion-safe:animate-pulse' : ''}`}
+    >
       {label}
     </span>
   )

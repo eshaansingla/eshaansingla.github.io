@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { cssVar, onThemeChange } from '../theme'
 
 /*
- * Fig. 1 — one trace, two worlds.
+ * Fig. 1, one trace, two worlds.
  *   physio: tympanic/PPG-style pulse with percussion (P1), tidal (P2) and dicrotic (P3) peaks.
  *           strain k∈[0,1] mimics a Valsalva: P2 climbs past P1, baseline lifts.
  *   market: jagged intraday tick curve (fractal value noise, quantised to tick size).
@@ -216,7 +216,7 @@ export default function SignalCanvas({ mode, strain, level, readoutRef, kRef, hi
         ctx.fillStyle = C.ink
         ctx.fill()
         const ms = Math.round(((headX - x) / headX) * 4000)
-        window.dispatchEvent(new CustomEvent('cursor:label', { detail: `${hintRef.current ? hintRef.current + ' · ' : ''}t−${ms} ms · ${fmt(v)}` }))
+        window.dispatchEvent(new CustomEvent('cursor:label', { detail: `${hintRef.current ? hintRef.current + ', ' : ''}t−${ms} ms, ${fmt(v)}` }))
       } else if (s.hoverX != null) {
         window.dispatchEvent(new CustomEvent('cursor:label', { detail: hintRef.current || 'now' }))
       }

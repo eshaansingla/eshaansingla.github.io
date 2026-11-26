@@ -4,7 +4,7 @@ import resumeUrl from './assets/Eshaan_Singla_Resume.pdf'
 
 export const profile = {
   name: 'Eshaan Singla',
-  role: 'CS Undergraduate · AI/ML + Full-Stack Engineer',
+  role: 'CS Undergraduate, AI/ML + Full-Stack Engineer',
   location: 'Patiala, India',
   headline: 'Making technology perform: find the bottleneck, fix it, prove it.',
   bio: 'B.E. Computer Science undergraduate at Thapar Institute of Engineering and Technology (CGPA: 9.00, Rank 1 Merit Scholar). Focused on bridging real-time distributed systems, applied machine learning, and clinical signal processing.',
@@ -16,12 +16,22 @@ export const profile = {
     linkedin: 'https://www.linkedin.com/in/eshaansingla',
     leetcode: 'https://leetcode.com/u/eshaansingla/',
     codeforces: 'https://codeforces.com/profile/EshaanSingla',
+    rocketleague: 'https://rocketleague.tracker.network/rocket-league/profile/epic/EshaanS_05/overview',
   },
 }
 
+// Every public profile, in the order they appear on the page
+export const profileLinks = [
+  { label: 'GitHub', handle: 'eshaansingla', href: 'https://github.com/eshaansingla' },
+  { label: 'LinkedIn', handle: 'in/eshaansingla', href: 'https://www.linkedin.com/in/eshaansingla' },
+  { label: 'LeetCode', handle: 'eshaansingla', href: 'https://leetcode.com/u/eshaansingla/' },
+  { label: 'Codeforces', handle: 'EshaanSingla', href: 'https://codeforces.com/profile/EshaanSingla' },
+  { label: 'Rocket League', handle: 'EshaanS_05', href: 'https://rocketleague.tracker.network/rocket-league/profile/epic/EshaanS_05/overview' },
+]
+
 export const telemetry = [
-  { label: 'CGPA', value: '9.00', note: 'B.E. CSE · TIET' },
-  { label: 'MERIT', value: 'R-01', note: 'Rank 1 · Merit-1 Scholar' },
+  { label: 'CGPA', value: '9.00', note: 'B.E. CSE, TIET' },
+  { label: 'MERIT', value: 'R-01', note: 'Rank 1, Merit-1 Scholar' },
   { label: 'LEETCODE', value: '1541', note: 'Contest rating' },
   { label: 'CODEFORCES', value: '1268', note: 'Pupil' },
 ]
@@ -48,12 +58,12 @@ export const projects = [
     description:
       'Multi-sensor ESP32 hardware setup (BPW34 tympanic sensor, MAX30102 PPG, MPU6050 IMU) extracting 6 physiological features via db4 wavelet decomposition & zero-phase Butterworth filtering (50 Hz). Trained XGBoost (AUC 0.951, F1 0.854) and LSTM temporal forecaster (AUC 0.896) across 25+ subjects + MIMIC-III/CHARIS ICU datasets (166 patients, 550K+ windows) with SHAP explainability. Deployed FastAPI + React/TypeScript clinical dashboard; targeting EMBC/INDICON 2026.',
     architecture: [
-      { stage: 'Sense', detail: 'BPW34 tympanic · MAX30102 PPG · MPU6050 IMU on ESP32' },
-      { stage: 'Condition', detail: 'Zero-phase Butterworth @ 50 Hz · db4 wavelet decomposition' },
+      { stage: 'Sense', detail: 'BPW34 tympanic, MAX30102 PPG, MPU6050 IMU on ESP32' },
+      { stage: 'Condition', detail: 'Zero-phase Butterworth @ 50 Hz, db4 wavelet decomposition' },
       { stage: 'Features', detail: '6 physiological features per window' },
-      { stage: 'Model', detail: 'XGBoost classifier + LSTM 15-min-ahead forecaster · SHAP' },
+      { stage: 'Model', detail: 'XGBoost classifier + LSTM 15-min-ahead forecaster, SHAP' },
       { stage: 'Validate', detail: '25+ subjects + MIMIC-III WDB / CHARIS (166 patients)' },
-      { stage: 'Serve', detail: 'FastAPI inference · React/TS clinical dashboard · CSV export' },
+      { stage: 'Serve', detail: 'FastAPI inference, React/TS clinical dashboard, CSV export' },
     ],
     metrics: [
       { k: 'XGBoost AUC', v: '0.951' },
@@ -85,10 +95,10 @@ export const projects = [
     description:
       'Real-time NSE market intelligence platform using WebSockets & React (100+ active users, 5,000+ daily requests in month 1). Engineered a 3-tier LLM router (Llama-3.3-70b, GPT-4o mini, custom rule engine), achieved <200ms rendering latency via two-phase IST-aware WebSocket feeds, and secured auth with JWT rotation, Google OAuth 2.0, and bcrypt-12 (22 API pytest suites).',
     architecture: [
-      { stage: 'Ingest', detail: 'NSE bulk & block deals · live price feed' },
-      { stage: 'Stream', detail: 'Two-phase price load · IST-aware adaptive WebSockets' },
+      { stage: 'Ingest', detail: 'NSE bulk & block deals, live price feed' },
+      { stage: 'Stream', detail: 'Two-phase price load, IST-aware adaptive WebSockets' },
       { stage: 'Route', detail: '3-tier LLM router: Llama-3.3-70b → GPT-4o mini → rule engine' },
-      { stage: 'Secure', detail: 'JWT rotation · Google OAuth 2.0 · bcrypt-12' },
+      { stage: 'Secure', detail: 'JWT rotation, Google OAuth 2.0, bcrypt-12' },
       { stage: 'Test', detail: '22 API pytest suites' },
     ],
     metrics: [
@@ -124,9 +134,9 @@ export const projects = [
     architecture: [
       { stage: 'Capture', detail: 'Field photo / report → Gemini Flash entity extraction' },
       { stage: 'Graph', detail: 'Neo4j node linked to location and causal chain' },
-      { stage: 'Assign', detail: 'Hungarian algorithm · skill · distance · workload' },
+      { stage: 'Assign', detail: 'Hungarian algorithm, skill, distance, workload' },
       { stage: 'Verify', detail: 'AI vision checks proof photo → task resolved' },
-      { stage: 'Serve', detail: 'Next.js 15 on Vercel · Django + Channels on Railway' },
+      { stage: 'Serve', detail: 'Next.js 15 on Vercel, Django + Channels on Railway' },
     ],
     metrics: [
       { k: 'Portals', v: 'NGO + Volunteer' },
@@ -158,9 +168,9 @@ export const projects = [
       'Gemini API legal assistant handling 1,200+ queries across 100+ IPC categories using custom intent recognition, multi-turn context retention, and citation-grounded response ranking.',
     architecture: [
       { stage: 'Intent', detail: 'Custom intent recognition, domain-gated' },
-      { stage: 'Context', detail: 'Multi-turn memory · PDF agreement upload' },
+      { stage: 'Context', detail: 'Multi-turn memory, PDF agreement upload' },
       { stage: 'Ground', detail: 'Ranking that maps intent to cited legal text' },
-      { stage: 'Generate', detail: 'Gemini API · Gradio interface' },
+      { stage: 'Generate', detail: 'Gemini API, Gradio interface' },
     ],
     metrics: [
       { k: 'User queries', v: '1,200+' },
@@ -190,7 +200,7 @@ export const projects = [
     architecture: [
       { stage: 'Data', detail: 'Custom-annotated plate dataset (LabelImg)' },
       { stage: 'Detect', detail: 'YOLOv8L on 1080p frames' },
-      { stage: 'Refine', detail: 'Dynamic confidence thresholds · bounding-box refinement' },
+      { stage: 'Refine', detail: 'Dynamic confidence thresholds, bounding-box refinement' },
       { stage: 'Track', detail: 'Multi-vehicle tracking in real time' },
     ],
     metrics: [
@@ -215,7 +225,7 @@ export const projects = [
       'Windows assistant that runs 6 decoding strategies side by side and scores each one, so you can see how text generation actually works.',
     pills: [
       { k: 'Sampling strategies', v: '6' },
-      { k: 'Metrics', v: 'PPL · BLEU · ROUGE' },
+      { k: 'Metrics', v: 'PPL, BLEU, ROUGE' },
     ],
     description:
       'A Windows desktop assistant you type or speak to. It executes system commands (open apps, notes, reminders, file search, volume, Wi-Fi) or writes a reply using six sampling strategies in parallel, scored with perplexity, BLEU and ROUGE so the best output is chosen transparently. Uses a cloud LLM (Groq, Gemini or OpenAI) plus a local distilgpt2 for top-k and beam strategies cloud APIs do not expose. Built as a team of three; I owned the FastAPI backend and Electron shell.',
@@ -223,12 +233,12 @@ export const projects = [
       { stage: 'Input', detail: 'Text or voice (faster-whisper)' },
       { stage: 'Route', detail: 'Intent → system action or generation' },
       { stage: 'Generate', detail: '6 strategies: cloud LLM + local distilgpt2' },
-      { stage: 'Score', detail: 'Perplexity · BLEU · ROUGE, side by side' },
-      { stage: 'Shell', detail: 'Electron + React/TypeScript · FastAPI + SQLite' },
+      { stage: 'Score', detail: 'Perplexity, BLEU, ROUGE, side by side' },
+      { stage: 'Shell', detail: 'Electron + React/TypeScript, FastAPI + SQLite' },
     ],
     metrics: [
       { k: 'Decoding strategies', v: '6' },
-      { k: 'LLM providers', v: 'Groq · Gemini · OpenAI' },
+      { k: 'LLM providers', v: 'Groq, Gemini, OpenAI' },
     ],
     stack: ['Python', 'FastAPI', 'SQLite', 'Transformers', 'PyTorch', 'faster-whisper', 'Electron', 'React', 'TypeScript'],
     links: [{ label: 'GitHub', href: 'https://github.com/eshaansingla/Aether' }],
@@ -238,17 +248,17 @@ export const projects = [
 
 // Additional public work on GitHub
 export const archive = [
-  { name: 'Parkinson’s Early Prediction', what: 'Voice CNN + tremor DNN fusion pipeline (internship work)', stack: 'TensorFlow · Librosa', href: 'https://github.com/eshaansingla/ParkinsonsEarlyPrediction', year: '2025' },
-  { name: 'Solara.Ai', what: 'Solar-plant anomaly, efficiency & failure-risk models behind a FastAPI service', stack: 'scikit-learn · FastAPI · React', href: 'https://github.com/eshaansingla/Solara.Ai', year: '2026' },
-  { name: 'KRYOSE', what: 'Cold-storage intelligence dashboard with alerts & analytics', stack: 'React · TypeScript · Node', href: 'https://github.com/eshaansingla/KRYOSE', year: '2026' },
-  { name: 'ScamurAi', what: 'Chrome extension that flags scam ads and fake articles in real time', stack: 'MV3 Extension · Python', href: 'https://github.com/eshaansingla/Scamurai', year: '2025' },
-  { name: 'Movies Recommendation', what: 'Content-based + collaborative filtering recommender', stack: 'Pandas · scikit-learn', href: 'https://github.com/eshaansingla/Movies-Recommendation', year: '2025' },
-  { name: 'Vital (Hackowasp)', what: 'Hackathon health-recommendation app with sentiment analysis', stack: 'MERN · NLP', href: 'https://github.com/eshaansingla/Hackowasp', year: '2024' },
+  { name: 'Parkinson’s Early Prediction', what: 'Voice CNN + tremor DNN fusion pipeline (internship work)', stack: 'TensorFlow, Librosa', href: 'https://github.com/eshaansingla/ParkinsonsEarlyPrediction', year: '2025' },
+  { name: 'Solara.Ai', what: 'Solar-plant anomaly, efficiency & failure-risk models behind a FastAPI service', stack: 'scikit-learn, FastAPI, React', href: 'https://github.com/eshaansingla/Solara.Ai', year: '2026' },
+  { name: 'KRYOSE', what: 'Cold-storage intelligence dashboard with alerts & analytics', stack: 'React, TypeScript, Node', href: 'https://github.com/eshaansingla/KRYOSE', year: '2026' },
+  { name: 'ScamurAi', what: 'Chrome extension that flags scam ads and fake articles in real time', stack: 'MV3 Extension, Python', href: 'https://github.com/eshaansingla/Scamurai', year: '2025' },
+  { name: 'Movies Recommendation', what: 'Content-based + collaborative filtering recommender', stack: 'Pandas, scikit-learn', href: 'https://github.com/eshaansingla/Movies-Recommendation', year: '2025' },
+  { name: 'Vital (Hackowasp)', what: 'Hackathon health-recommendation app with sentiment analysis', stack: 'MERN, NLP', href: 'https://github.com/eshaansingla/Hackowasp', year: '2024' },
 ]
 
 export const experience = [
   {
-    role: 'Research Intern — ML & Computer Vision',
+    role: 'Research Intern, ML & Computer Vision',
     org: 'Thapar Institute of Engineering and Technology (ELC)',
     period: 'Jun 2025 – Jul 2025',
     place: 'Patiala, India',
@@ -273,7 +283,7 @@ export const education = [
 ]
 
 export const honors = [
-  { title: 'Merit-1 Scholarship', detail: 'Rank 1 in B.E. CSE · JEE Mains 98.4 percentile', year: '2023–24' },
+  { title: 'Merit-1 Scholarship', detail: 'Rank 1 in B.E. CSE, JEE Mains 98.4 percentile', year: '2023–24' },
   { title: 'ELC Summer Research Fellow', detail: 'Competitively selected among top AI/ML candidates', year: '2025' },
   { title: '500+ DSA problems solved', detail: 'Across LeetCode and Codeforces', year: 'Ongoing' },
 ]
@@ -313,26 +323,26 @@ export const skills = [
   },
 ]
 
-// Reference list — cited inline as [n]
+// Reference list, cited inline as [n]
 export const refs = {
-  1: { label: 'GitHub', text: 'github.com/eshaansingla — all public code', href: 'https://github.com/eshaansingla' },
+  1: { label: 'GitHub', text: 'github.com/eshaansingla, all public code', href: 'https://github.com/eshaansingla' },
   2: { label: 'LinkedIn', text: 'linkedin.com/in/eshaansingla', href: 'https://www.linkedin.com/in/eshaansingla' },
-  3: { label: 'LeetCode', text: 'Contest rating 1541 (top 34.7%) · 576 solved: 267 easy, 282 medium, 27 hard', href: 'https://leetcode.com/u/eshaansingla/' },
-  4: { label: 'Codeforces', text: 'Rating 1268 · Pupil', href: 'https://codeforces.com/profile/EshaanSingla' },
+  3: { label: 'LeetCode', text: 'Contest rating 1541 (top 34.7%), 576 solved: 267 easy, 282 medium, 27 hard', href: 'https://leetcode.com/u/eshaansingla/' },
+  4: { label: 'Codeforces', text: 'Rating 1268, Pupil', href: 'https://codeforces.com/profile/EshaanSingla' },
   5: { label: 'Pran', text: 'Optical eardrum sensing: firmware, 146-subject study, 14 models, leakage audit', href: 'https://github.com/eshaansingla/Pran' },
-  6: { label: 'FIN-X (live)', text: 'finx-pi.vercel.app — real-time NSE intelligence', href: 'https://finx-pi.vercel.app' },
+  6: { label: 'FIN-X (live)', text: 'finx-pi.vercel.app, real-time NSE intelligence', href: 'https://finx-pi.vercel.app' },
   7: { label: 'FIN-X (code)', text: 'github.com/eshaansingla/finx', href: 'https://github.com/eshaansingla/finx' },
-  8: { label: 'Sanchaalan Saathi', text: 'sanchaalan-saathi.vercel.app — NGO coordination platform', href: 'https://sanchaalan-saathi.vercel.app' },
+  8: { label: 'Sanchaalan Saathi', text: 'sanchaalan-saathi.vercel.app, NGO coordination platform', href: 'https://sanchaalan-saathi.vercel.app' },
   9: { label: 'NyaayaBot', text: 'github.com/eshaansingla/NyaayaBot', href: 'https://github.com/eshaansingla/NyaayaBot' },
   10: { label: 'License-Plate-Detection', text: 'YOLOv8L detection and tracking', href: 'https://github.com/eshaansingla/License-Plate-Detection' },
   11: { label: 'AETHER', text: 'Desktop GenAI assistant; evaluation run of 6 decoding strategies', href: 'https://github.com/eshaansingla/Aether' },
   12: { label: 'Parkinson’s Early Prediction', text: 'Voice CNN + tremor DNN fusion (ELC internship)', href: 'https://github.com/eshaansingla/ParkinsonsEarlyPrediction' },
 }
 
-// Rocket League — snapshot from rocketleague.tracker.network (Epic, PC), 27 Nov 2026
+// Rocket League, snapshot from rocketleague.tracker.network (Epic, PC), 27 Nov 2026
 export const rocketLeague = {
   handle: 'EshaanS_05',
-  platform: 'Epic · PC',
+  platform: 'Epic, PC',
   season: 'Season 24',
   rewardLevel: 'Platinum',
   snapshot: '27 Nov 2026',

@@ -129,15 +129,15 @@ export default function RocketLeague() {
   const marks = [
     ['now', p.rating, 'current'],
     p.peak && p.peak !== p.rating ? ['peak', p.peak, 'season peak'] : null,
-    p.best && p.best !== p.rating ? ['best', p.best, `all-time best · ${p.bestSeason}`] : null,
+    p.best && p.best !== p.rating ? ['best', p.best, `all-time best, ${p.bestSeason}`] : null,
   ].filter(Boolean)
   const d = sel ? DETAIL[sel](RL.lifetime.find((x) => x.k === sel).v) : null
   const ring = 2 * Math.PI * 30
 
   return (
     <Device
-      name={`Rocket League · ${RL.handle}`}
-      sub={`${RL.platform} · ${RL.season} · snapshot ${RL.snapshot}`}
+      name={`Rocket League, ${RL.handle}`}
+      sub={`${RL.platform}, ${RL.season}, snapshot ${RL.snapshot}`}
       status="live"
       statusLabel="off-hours"
       toolbar={
@@ -171,7 +171,7 @@ export default function RocketLeague() {
           <AnimatePresence mode="wait">
             <motion.div key={id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="relative text-center">
               <p className="text-[1.35rem] leading-tight">{p.tier} {ROMAN[p.tierN - 1]}</p>
-              <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-mute">Division {ROMAN[p.div - 1]}{p.main ? ' · main playlist' : ''}</p>
+              <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-mute">Division {ROMAN[p.div - 1]}{p.main ? ', main playlist' : ''}</p>
             </motion.div>
           </AnimatePresence>
         </div>
@@ -205,7 +205,7 @@ export default function RocketLeague() {
                   animate={{ left: `${pos(v)}%` }}
                   transition={{ type: 'spring', stiffness: 140, damping: 20 }}
                   data-cursor="snap"
-                  data-cursor-label={`${label} · ${v}`}
+                  data-cursor-label={`${label}, ${v}`}
                   tabIndex={0}
                   aria-label={`${label} ${v}`}
                 >
@@ -226,7 +226,7 @@ export default function RocketLeague() {
                 <button
                   key={s.k}
                   onClick={() => setSel(sel === s.k ? null : s.k)}
-                  data-cursor-label={`${s.k} · details`}
+                  data-cursor-label={`${s.k}, details`}
                   className={`rounded-xl border p-3 text-left transition-colors ${sel === s.k ? 'border-signal bg-signal/[0.06]' : 'border-rule hover:border-ink/40'}`}
                 >
                   <span className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.12em] text-mute">
@@ -256,7 +256,7 @@ export default function RocketLeague() {
           </div>
         </div>
 
-        <Panel open={!!sel} onClose={close} left={62} top={46} title={sel ? `${sel} · lifetime` : ''} rows={d?.rows ?? []}>
+        <Panel open={!!sel} onClose={close} left={62} top={46} title={sel ? `${sel}, lifetime` : ''} rows={d?.rows ?? []}>
           {d?.text}
         </Panel>
       </div>

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Device, Seg, Tween } from '../kit'
 
-// Fig. 7 — real numbers: AETHER evaluation run, 9 prompts × 6 strategies
+// Fig. 7, real numbers: AETHER evaluation run, 9 prompts × 6 strategies
 // (aether/backend/eval_results/latest_summary.md).
 const ROWS = [
   { s: 'Greedy decoding', ppl: 1539.82, bleu: 32.89, rouge: 0.761 },
@@ -13,9 +13,9 @@ const ROWS = [
   { s: 'Beam search, 5 beams', ppl: 8.82, bleu: 5.31, rouge: 0.168, local: true },
 ]
 const M = {
-  rouge: { label: 'ROUGE-L', hi: true, f: (v) => v.toFixed(3), bar: (v) => v / 0.8, note: 'overlap with a reference answer · higher is better · 7 prompts' },
-  bleu: { label: 'BLEU', hi: true, f: (v) => v.toFixed(2), bar: (v) => v / 36, note: 'n-gram match with a reference · higher is better · 7 prompts' },
-  ppl: { label: 'perplexity', hi: false, f: (v) => v.toFixed(2), bar: (v) => 1 - Math.log10(v) / Math.log10(2000), note: 'how unsurprising the text is to a fixed distilgpt2 · lower is better · 9 prompts' },
+  rouge: { label: 'ROUGE-L', hi: true, f: (v) => v.toFixed(3), bar: (v) => v / 0.8, note: 'overlap with a reference answer, higher is better, 7 prompts' },
+  bleu: { label: 'BLEU', hi: true, f: (v) => v.toFixed(2), bar: (v) => v / 36, note: 'n-gram match with a reference, higher is better, 7 prompts' },
+  ppl: { label: 'perplexity', hi: false, f: (v) => v.toFixed(2), bar: (v) => 1 - Math.log10(v) / Math.log10(2000), note: 'how unsurprising the text is to a fixed distilgpt2, lower is better, 9 prompts' },
 }
 
 export default function MetricRank() {
@@ -27,8 +27,8 @@ export default function MetricRank() {
 
   return (
     <Device
-      name="AETHER · eval leaderboard"
-      sub="run 2026-11-17 · 9 prompts × 6 strategies"
+      name="AETHER, eval leaderboard"
+      sub="run 2026-11-17, 9 prompts × 6 strategies"
       status="live"
       statusLabel="results"
       toolbar={

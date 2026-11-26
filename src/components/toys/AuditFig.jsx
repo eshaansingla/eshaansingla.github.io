@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Btn, Device, EASE, Tween } from '../kit'
 
-// Fig. 2 — every number is from github.com/eshaansingla/Pran (hardware-vasalva-method/, testing/).
+// Fig. 2, every number is from github.com/eshaansingla/Pran (hardware-vasalva-method/, testing/).
 const CHECKS = [
   { name: 'Untouched final test, 29 subjects', v: 0.995, verdict: 'result',
     note: 'Scored once, after every modelling choice was frozen. Sensitivity 0.957, specificity 0.967 at the threshold picked on validation subjects.' },
@@ -72,7 +72,7 @@ export default function AuditFig() {
   return (
     <Device
       name="pran / leakage-audit"
-      sub={`${CHECKS.length - 1} checks · every number from the repository`}
+      sub={`${CHECKS.length - 1} checks, every number from the repository`}
       status={running ? 'run' : 'live'}
       statusLabel={running ? 'running' : 'ready'}
       toolbar={
@@ -89,9 +89,9 @@ export default function AuditFig() {
       }
       footer={
         <>
-          <span>source: hardware-vasalva-method/ · testing/</span>
+          <span>source: hardware-vasalva-method/, testing/</span>
           <span>AUC on held-out subjects</span>
-          <span className="ml-auto hidden sm:inline">↑ ↓ move · Enter opens</span>
+          <span className="ml-auto hidden sm:inline">↑ ↓ move, Enter opens</span>
         </>
       }
     >
@@ -193,7 +193,7 @@ export default function AuditFig() {
                     {isRan ? (
                       Array.isArray(c.v) ? `${lo.toFixed(3)}–${hi.toFixed(3).slice(1)}` : <Tween value={c.v} format={(x) => x.toFixed(3)} duration={1} />
                     ) : (
-                      <span className="text-mute">—</span>
+                      <span className="text-mute">pending</span>
                     )}
                   </span>
                   <motion.span

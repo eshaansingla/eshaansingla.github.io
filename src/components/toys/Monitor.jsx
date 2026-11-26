@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import SignalCanvas, { p1, p2 } from '../SignalCanvas'
 import { Device, Panel, Seg } from '../kit'
 
-// Fig. 1 — presented as an amber bedside monitor. Logic lives in SignalCanvas (unchanged).
+// Fig. 1, presented as an amber bedside monitor. Logic lives in SignalCanvas (unchanged).
 function Fps() {
   const ref = useRef(null)
   useEffect(() => {
@@ -16,7 +16,7 @@ function Fps() {
     raf = requestAnimationFrame(f)
     return () => cancelAnimationFrame(raf)
   }, [])
-  return <span ref={ref} className="tabular-nums">— fps</span>
+  return <span ref={ref} className="tabular-nums">60 fps</span>
 }
 
 export const MANOEUVRES = [
@@ -37,12 +37,12 @@ const INFO = {
   },
   ratio: {
     title: 'P2 / P1 ratio',
-    rows: [['resting', p2(0) / p1(0) > 0 ? (p2(0) / p1(0)).toFixed(2) : '—'], ['full strain', (p2(1) / p1(1)).toFixed(2)], ['flag above', '1.00']],
+    rows: [['resting', p2(0) / p1(0) > 0 ? (p2(0) / p1(0)).toFixed(2) : '0'], ['full strain', (p2(1) / p1(1)).toFixed(2)], ['flag above', '1.00']],
     text: 'When the brain’s compliance drops, the tidal peak (P2) rises past the percussion peak (P1). A ratio above 1 is the shape clinicians look for.',
   },
   state: {
     title: 'Response by manoeuvre',
-    rows: [['head-up 30°', '−0.04 · 36% rose'], ['supine', 'baseline'], ['head-down 10°', '+0.24 · 99% rose'], ['Valsalva', '+1.19 · 100% rose'], ['volunteers', '146']],
+    rows: [['head-up 30°', '−0.04, 36% rose'], ['supine', 'baseline'], ['head-down 10°', '+0.24, 99% rose'], ['Valsalva', '+1.19, 100% rose'], ['volunteers', '146']],
     text: 'Optical slow-wave power against each volunteer’s own supine baseline, in baseline SD units (repo: docs/HARDWARE_RESULTS.md). Head-down and Valsalva rise in almost every subject; Valsalva rises in all 146.',
   },
   feed: {
@@ -101,7 +101,7 @@ export default function Monitor({ mode, setMode, man, setMan }) {
     ? [
         { id: 'hr', label: 'HR', value: '72', unit: 'bpm' },
         { id: 'ratio', label: 'P2 / P1', live: true, unit: active.idx > 0.1 ? 'rising' : 'baseline' },
-        { id: 'state', label: active.label, value: fmtIdx(active.idx), unit: active.id === 'supine' ? 'reference' : `SD vs supine · rose in ${active.rise}`, bar: true },
+        { id: 'state', label: active.label, value: fmtIdx(active.idx), unit: active.id === 'supine' ? 'reference' : `SD vs supine, rose in ${active.rise}`, bar: true },
       ]
     : [
         { id: 'feed', label: 'Feed', value: 'NSE', unit: 'sim' },
@@ -113,7 +113,7 @@ export default function Monitor({ mode, setMode, man, setMan }) {
     <Device
       className="dark"
       name="PRAN-01"
-      sub={hold ? `tympanic optical + PPG · ch1 · ${active.note}` : 'NSE tick stream · ch2'}
+      sub={hold ? `tympanic optical + PPG, ch1, ${active.note}` : 'NSE tick stream, ch2'}
       status="live"
       statusLabel="sim"
       toolbar={
@@ -122,7 +122,7 @@ export default function Monitor({ mode, setMode, man, setMan }) {
             label="Channel"
             value={mode}
             onChange={(v) => { setMode(v); if (v === 'market') setStrain(false); setPanel(null) }}
-            options={[['physio', 'ch1 · eardrum / PPG'], ['market', 'ch2 · NSE ticks']]}
+            options={[['physio', 'ch1 eardrum/PPG'], ['market', 'ch2 NSE ticks']]}
           />
           <AnimatePresence>
             {hold && (
@@ -133,14 +133,14 @@ export default function Monitor({ mode, setMode, man, setMan }) {
           </AnimatePresence>
           {hold && (
             <span className="ml-auto hidden font-mono text-[11px] text-mute xl:inline">
-              keys <kbd className="rounded border border-ink/20 px-1 text-ink">1</kbd>–<kbd className="rounded border border-ink/20 px-1 text-ink">4</kbd> · hold <kbd className="rounded border border-ink/20 px-1 text-ink">Space</kbd>
+              Keys <kbd className="rounded border border-ink/20 px-1 text-ink">1</kbd>–<kbd className="rounded border border-ink/20 px-1 text-ink">4</kbd>, hold <kbd className="rounded border border-ink/20 px-1 text-ink">Space</kbd>
             </span>
           )}
         </>
       }
       footer={
         <>
-          <span>{hold ? '50 Hz · 1 s / div' : 'tick-quantised · two-phase load'}</span>
+          <span>{hold ? '50 Hz, 1 s per division' : 'tick-quantised, two-phase load'}</span>
           <span>{hold ? 'response scaled to the 146-subject means' : 'hover to read any sample'}</span>
           <span className="ml-auto"><Fps /></span>
         </>
@@ -157,7 +157,7 @@ export default function Monitor({ mode, setMode, man, setMan }) {
           onContextMenu={(e) => hold && e.preventDefault()}
         >
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_90%_at_50%_45%,transparent_55%,rgb(0_0_0/0.45))]" />
-          <SignalCanvas mode={mode} level={hold ? level : 0} readoutRef={readoutRef} kRef={kRef} hint={hold ? `${active.label}${strain ? '' : ' · hold for Valsalva'}` : ''} />
+          <SignalCanvas mode={mode} level={hold ? level : 0} readoutRef={readoutRef} kRef={kRef} hint={hold ? `${active.label}${strain ? '' : ', hold for Valsalva'}` : ''} />
           <div className="pointer-events-none absolute inset-0 opacity-[0.05] [background:repeating-linear-gradient(0deg,#fff_0_1px,transparent_1px_3px)]" />
           <AnimatePresence>
             {hold && active.id === 'valsalva' && (
@@ -195,7 +195,7 @@ export default function Monitor({ mode, setMode, man, setMan }) {
               </span>
               <span className="flex items-end gap-2">
                 {t.live ? (
-                  <b ref={readoutRef} className="font-mono text-[26px] font-medium leading-none tabular-nums text-signal md:text-[30px]">—</b>
+                  <b ref={readoutRef} className="font-mono text-[26px] font-medium leading-none tabular-nums text-signal md:text-[30px]"></b>
                 ) : (
                   <AnimatePresence mode="wait">
                     <motion.b

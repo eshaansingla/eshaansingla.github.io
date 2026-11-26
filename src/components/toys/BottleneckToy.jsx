@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Btn, Device, Panel, Stat, Tween } from '../kit'
 
-// Fig. 8 — find the bottleneck. Stage times are illustrative; the −40% target is the measured result.
+// Fig. 8, find the bottleneck. Stage times are illustrative; the −40% target is the measured result.
 const STAGES = [
   { id: 'load', name: 'load recordings', before: 110, after: 95, effort: 2, fix: 'memory-mapped reads' },
   { id: 'resample', name: 'resample', before: 170, after: 110, effort: 1, fix: 'one polyphase pass' },
@@ -33,8 +33,8 @@ export default function BottleneckToy() {
 
   return (
     <Device
-      name="profiler · feature pipeline"
-      sub="per 1,000 samples · illustrative timings"
+      name="profiler, feature pipeline"
+      sub="per 1,000 samples, illustrative timings"
       status="live"
       statusLabel="profiling"
       toolbar={
@@ -50,7 +50,7 @@ export default function BottleneckToy() {
       }
       footer={
         <>
-          <span>click a block for its trace · Enter on a card applies a fix</span>
+          <span>click a block for its trace, Enter on a card applies a fix</span>
           <span className="ml-auto">bottleneck: {bottleneck.name}</span>
         </>
       }
@@ -68,7 +68,7 @@ export default function BottleneckToy() {
                 <motion.button
                   key={s.id}
                   onClick={() => setSel(s.id)}
-                  data-cursor-label={`${s.name} · ${t(s)} ms · ${Math.round((t(s) / total) * 100)}%`}
+                  data-cursor-label={`${s.name}, ${t(s)} ms, ${Math.round((t(s) / total) * 100)}%`}
                   title={`${s.name}: ${t(s)} ms`}
                   className={`relative h-full shrink-0 overflow-hidden rounded-lg text-left font-mono text-[10.5px] leading-tight ${
                     isB ? 'bg-signal text-signal-ink' : on ? 'bg-ink/15 text-ink' : 'bg-ink text-canvas'
@@ -112,8 +112,8 @@ export default function BottleneckToy() {
           left={selS ? ((starts[selS.id] + t(selS) / 2) / BASE) * 100 : 50}
           top={30}
           title={selS ? selS.name : ''}
-          rows={selS ? [['starts at', `${starts[selS.id]} ms`], ['duration', `${t(selS)} ms`], ['share', `${Math.round((t(selS) / total) * 100)}%`], ['fix', selS.fix], ['effort', '●'.repeat(selS.effort) + '○'.repeat(3 - selS.effort)]] : []}
-          action={selS && <Btn primary onClick={() => flip(selS.id)}>{fixed.has(selS.id) ? 'undo fix' : `apply fix · −${selS.before - selS.after} ms`}</Btn>}
+          rows={selS ? [['starts at', `${starts[selS.id]} ms`], ['duration', `${t(selS)} ms`], ['share', `${Math.round((t(selS) / total) * 100)}%`], ['fix', selS.fix], ['effort', `${selS.effort} of 3`]] : []}
+          action={selS && <Btn primary onClick={() => flip(selS.id)}>{fixed.has(selS.id) ? 'undo fix' : `apply fix, −${selS.before - selS.after} ms`}</Btn>}
         />
 
         <ul className="mt-7 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -125,7 +125,7 @@ export default function BottleneckToy() {
                 <motion.button
                   layout
                   onClick={() => flip(s.id)}
-                  data-cursor-label={on ? 'undo' : `fix · effort ${s.effort}`}
+                  data-cursor-label={on ? 'undo' : `fix, effort ${s.effort}`}
                   className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors ${
                     on ? 'border-signal/50 bg-signal/[0.06]' : isB ? 'border-signal/70' : 'border-rule hover:border-ink/40'
                   }`}
@@ -139,7 +139,7 @@ export default function BottleneckToy() {
                       <span className="font-mono text-[11px] text-mute">{Math.round((t(s) / total) * 100)}%</span>
                     </span>
                     <span className="mt-1 block font-mono text-[10.5px] text-mute">
-                      {on ? s.fix : `${s.before} → ${s.after} ms · effort ${'●'.repeat(s.effort)}${'○'.repeat(3 - s.effort)}`}
+                      {on ? s.fix : `${s.before} → ${s.after} ms, effort ${s.effort} of 3`}
                     </span>
                   </span>
                 </motion.button>

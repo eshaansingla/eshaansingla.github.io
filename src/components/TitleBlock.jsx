@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import Monitor from './toys/Monitor'
 import { Figure, Row, Num } from './ui'
-import { profile } from '../data'
+import { profile, profileLinks } from '../data'
 
 const EASE = [0.22, 1, 0.36, 1]
 
@@ -16,7 +16,7 @@ export default function TitleBlock() {
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6 }}
           className="font-mono text-[11.5px] text-mute"
         >
-          Working paper · revised 26 Nov 2026 · Patiala, IN
+          Working paper, revised 26 Nov 2026, Patiala
         </motion.p>
         <motion.h1
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: EASE, delay: 0.1 }}
@@ -36,9 +36,24 @@ export default function TitleBlock() {
             Eshaan Singla<sup className="ml-0.5 font-mono text-[0.45em] text-signal">1</sup>
           </p>
           <p className="mt-1 text-[15px] leading-snug text-mute">
-            <sup className="font-mono text-signal">1</sup> B.E. Computer Science, Thapar Institute of Engineering and Technology, Patiala ·{' '}
+            <sup className="font-mono text-signal">1</sup> B.E. Computer Science, Thapar Institute of Engineering and Technology, Patiala {' '}
             <a href={`mailto:${profile.email}`} className="underline decoration-rule-2 underline-offset-2 hover:text-signal">{profile.email}</a>
           </p>
+          <ul className="mt-4 flex flex-wrap gap-2">
+            {profileLinks.map((l, i) => (
+              <motion.li key={l.label} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 + i * 0.05 }}>
+                <a
+                  href={l.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group inline-flex items-center gap-1.5 rounded-full border border-ink/15 px-3 py-1.5 font-mono text-[11.5px] text-ink-2 transition-colors hover:border-signal hover:text-signal"
+                >
+                  {l.label}
+                  <span className="inline-block transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5">↗</span>
+                </a>
+              </motion.li>
+            ))}
+          </ul>
         </motion.div>
       </Row>
 
@@ -55,7 +70,7 @@ export default function TitleBlock() {
           </p>
           <p className="mt-4 text-[16px] text-mute">
             <span className="smallcaps mr-2 text-ink">Keywords:</span>
-            signal processing · real-time systems · applied ML · evaluation · full-stack
+            signal processing, real-time systems, applied ML, evaluation, full-stack
           </p>
           <div className="mt-7 flex flex-wrap items-center gap-3">
             <a href={profile.resume} download className="inline-block rounded-full bg-ink px-5 py-3 font-mono text-[12.5px] leading-none text-canvas transition-colors hover:bg-signal hover:text-signal-ink">

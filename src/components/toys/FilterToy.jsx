@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { animate, motion } from 'framer-motion'
 import { Device, EASE, Panel, Seg, Stat, Toggle, Tween } from '../kit'
 
-// Fig. 3 — the filter, in frequency and in time. Drag the cutoff on the spectrum; the trace morphs.
+// Fig. 3, the filter, in frequency and in time. Drag the cutoff on the spectrum; the trace morphs.
 const FS = 50
 const N = 400
 const gauss = (x, m, s) => Math.exp(-((x - m) ** 2) / (2 * s * s))
@@ -143,7 +143,7 @@ export default function FilterToy() {
   return (
     <Device
       name="signal analyzer"
-      sub="ch1 · 400 samples @ 50 Hz · 2nd-order Butterworth"
+      sub="ch1, 400 samples @ 50 Hz, 2nd-order Butterworth"
       status="live"
       statusLabel="live"
       toolbar={
@@ -164,7 +164,7 @@ export default function FilterToy() {
           <span><i className="mr-1.5 inline-block h-px w-4 -translate-y-[3px] bg-ink/40" />raw</span>
           <span><i className="mr-1.5 inline-block w-4 -translate-y-[3px] border-t border-dashed border-ink" />true pulse</span>
           <span><i className="mr-1.5 inline-block h-0.5 w-4 -translate-y-[3px] bg-signal" />filtered</span>
-          <span className="ml-auto hidden sm:inline">← → nudge cutoff · click the trace to inspect</span>
+          <span className="ml-auto hidden sm:inline">← → nudge cutoff, click the trace to inspect</span>
         </>
       }
     >
@@ -181,7 +181,7 @@ export default function FilterToy() {
         onKeyDown={onKey}
         className="relative touch-none select-none border-b border-rule outline-none focus-visible:bg-signal/[0.04]"
         data-cursor="drag"
-        data-cursor-label={hoverF != null ? `${hoverF.toFixed(1)} Hz · keeps ${Math.round(resp(hoverF) * 100)}%` : 'drag the cutoff'}
+        data-cursor-label={hoverF != null ? `${hoverF.toFixed(1)} Hz, keeps ${Math.round(resp(hoverF) * 100)}%` : 'drag the cutoff'}
         onPointerDown={(e) => { dragging.current = true; e.currentTarget.setPointerCapture(e.pointerId); setFrom(e) }}
         onPointerMove={(e) => {
           const r = strip.current.getBoundingClientRect()
@@ -259,7 +259,7 @@ export default function FilterToy() {
           onClose={closePick}
           left={pick ? (pick.i / (N - 1)) * 100 : 50}
           top={pick && pick.top > 40 ? 4 : (pick?.top ?? 20) + 4}
-          title={pick ? `sample ${pick.i} · t = ${(pick.i / FS).toFixed(2)} s` : ''}
+          title={pick ? `sample ${pick.i}, t = ${(pick.i / FS).toFixed(2)} s` : ''}
           rows={pick ? [['raw', raw[pick.i].toFixed(3)], ['true pulse', clean[pick.i].toFixed(3)], ['filtered', target[pick.i].toFixed(3)], ['error', (target[pick.i] - clean[pick.i]).toFixed(3)]] : []}
         />
       </div>

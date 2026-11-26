@@ -74,7 +74,7 @@ export default function Header() {
     <header className="sticky top-0 z-40 bg-canvas/90 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-[1040px] items-center justify-between gap-4 px-5 md:px-8">
         <a href="#top" className="whitespace-nowrap text-[17px] italic" data-cursor-label="top">
-          E. Singla <span className="not-italic text-mute">— working notes</span>
+          E. Singla <span className="ml-1.5 not-italic text-mute">working notes</span>
         </a>
         <nav className="flex items-center gap-2 font-mono text-[11.5px] md:gap-3" aria-label="Sections">
           {LINKS.map(([id, label]) => (

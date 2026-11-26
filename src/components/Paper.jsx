@@ -3,27 +3,27 @@ import { Cite, Figure, H2, H3, Num, P, Row } from './ui'
 import { Btn, Seg } from './kit'
 import AuditFig from './toys/AuditFig'
 import FilterToy from './toys/FilterToy'
-import RouterToy from './toys/RouterToy'
-import AssignToy from './toys/AssignToy'
-import ThresholdToy from './toys/ThresholdToy'
+import Radar from './toys/Radar'
+import OpsRoom from './toys/OpsRoom'
+import TrafficCam from './toys/TrafficCam'
 import MetricRank from './toys/MetricRank'
 import BottleneckToy from './toys/BottleneckToy'
 import RocketLeague from './toys/RocketLeague'
-import { archive, competitive, education, honors, profile, refs, skills } from '../data'
+import { archive, competitive, education, honors, profile, profileLinks, refs, skills } from '../data'
 
 const RESULTS = [
   ['Pran', 'AUC on 29 untouched test subjects', '0.995', 'chance (0.5)', 'icp'],
   ['Pran', 'Sensitivity / specificity on the same subjects', '0.957 / 0.967', 'threshold set on validation only', 'icp'],
   ['Pran', 'Same pipeline, labels shuffled within subject', '0.501', 'should be ~0.5', 'icp'],
   ['FIN-X', 'Data rendering latency', '< 200 ms', 'two-phase load', 'finx'],
-  ['FIN-X', 'Active users / requests per day, month 1', '100+ / 5,000+', '—', 'finx'],
-  ['FIN-X', 'API test suites', '22', '—', 'finx'],
-  ['Plates', 'Throughput on 1080p video', '30+ FPS', '—', 'lpd'],
+  ['FIN-X', 'Active users / requests per day, month 1', '100+ / 5,000+', '', 'finx'],
+  ['FIN-X', 'API test suites', '22', '', 'finx'],
+  ['Plates', 'Throughput on 1080p video', '30+ FPS', '', 'lpd'],
   ['Plates', 'Detection accuracy', '92%', 'custom-annotated set', 'lpd'],
   ['Plates', 'Low-light false positives', '−30%', 'one fixed threshold', 'lpd'],
   ['AETHER', 'Best ROUGE-L (greedy decoding)', '0.761', '5 other strategies', 'aether'],
-  ['NyaayaBot', 'Queries handled / IPC categories', '1,200+ / 100+', '—', 'nyaaya'],
-  ['Parkinson’s', 'Multimodal classification accuracy', '91%', '—', 'experience'],
+  ['NyaayaBot', 'Queries handled / IPC categories', '1,200+ / 100+', '', 'nyaaya'],
+  ['Parkinson’s', 'Multimodal classification accuracy', '91%', '', 'experience'],
   ['Parkinson’s', 'False-negative rate', '−18%', 'logistic regression', 'experience'],
   ['Parkinson’s', 'Feature-extraction time, 40,000+ samples', '−40%', 'previous pipeline', 'experience'],
 ]
@@ -95,6 +95,22 @@ function Correspondence() {
         <a href={`tel:${profile.phone.replace(/-/g, '')}`} className="mt-2 inline-block font-mono text-[14px] text-ink-2 hover:text-signal">
           {profile.phone}
         </a>
+        <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {[...profileLinks, { label: 'Résumé', handle: 'PDF', href: profile.resume, download: true }].map((l) => (
+            <a
+              key={l.label}
+              href={l.href}
+              {...(l.download ? { download: 'Eshaan_Singla_Resume.pdf' } : { target: '_blank', rel: 'noreferrer' })}
+              className="group flex items-center justify-between rounded-xl border border-rule px-3.5 py-3 transition-colors hover:border-signal"
+            >
+              <span>
+                <span className="block text-[16px] leading-tight group-hover:text-signal">{l.label}</span>
+                <span className="block font-mono text-[11px] text-mute">{l.handle}</span>
+              </span>
+              <span className="text-mute transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-signal">{l.download ? '↓' : '↗'}</span>
+            </a>
+          ))}
+        </div>
       </div>
     </Row>
   )
@@ -115,7 +131,7 @@ export default function Paper() {
         where I have real numbers the figure uses them. Code for all of it is on GitHub <Cite n={1} />.
       </P>
 
-      <H3 id="icp" n="1.1" meta={<>Capstone · 2025–26 · complete<br />Team of five; I led the ML and worked on data collection<br />ESP32 · XGBoost · scikit-learn · SciPy · Flask<br />{code(5)}</>}>
+      <H3 id="icp" n="1.1" meta={<>Capstone, 2025–26, complete<br />Team of five; I led the ML and worked on data collection<br />ESP32, XGBoost, scikit-learn, SciPy, Flask<br />{code(5)}</>}>
         Pran: reading pressure changes through the eardrum
       </H3>
       <P>
@@ -124,7 +140,7 @@ export default function Paper() {
         pressure change at all? The rig is an ESP32 reading a quad BPW34 photodiode through an
         ADS1115, alongside a MAX30105 PPG and an MPU6050 IMU, at <Num>50 Hz</Num> <Cite n={5} />.
       </P>
-      <P note={<>46,407 windows · 32 optical features<br />14 models, one protocol<br />test subjects scored once</>}>
+      <P note={<>46,407 windows, 32 optical features<br />14 models, one protocol<br />test subjects scored once</>}>
         We recorded <Num>146</Num> volunteers lying flat, tilted head-up, tilted head-down and
         straining (the Valsalva manoeuvre). Before any modelling, <Num>29</Num> of them were set
         aside and only scored at the very end. On those subjects the top group of models
@@ -144,7 +160,7 @@ export default function Paper() {
         <FilterToy />
       </Figure>
 
-      <H3 id="finx" n="1.2" meta={<>2026 · live<br />FastAPI · PostgreSQL · WebSockets · React · Groq · OpenAI<br />{code(6, 'live ↗')} · {code(7)}</>}>
+      <H3 id="finx" n="1.2" meta={<>2026, live<br />FastAPI, PostgreSQL, WebSockets, React, Groq, OpenAI<br />{code(6, 'live ↗')}, {code(7)}</>}>
         FIN-X: real-time market intelligence for the NSE
       </H3>
       <P note="Spelled FIN-X, said “Phoenix”.">
@@ -160,11 +176,11 @@ export default function Paper() {
         from the models entirely. Auth uses JWT rotation, Google OAuth 2.0 and bcrypt-12, covered
         by <Num>22</Num> pytest suites <Cite n={7} />.
       </P>
-      <Figure n={4} caption="The fallback chain, simplified (the production router also picks a tier by intent). Type a question, then take providers down and ask again. Something always answers, and off-topic questions never reach a model.">
-        <RouterToy />
+      <Figure n={4} caption="The Opportunity Radar, with a simulated feed. Deals stream in; pick one and the question goes through the real routing order: an intent check, then Llama-3.3-70b, GPT-4o mini if it is down, and the rule engine if both are. Switch providers off to watch the fallback, or ask your own follow-up. The render time is measured live in your browser.">
+        <Radar />
       </Figure>
 
-      <H3 id="sanchaalan" n="1.3" meta={<>2026 · live<br />Next.js 15 · Django Channels · PostgreSQL · Neo4j · Gemini<br />{code(8, 'live ↗')}</>}>
+      <H3 id="sanchaalan" n="1.3" meta={<>2026, live<br />Next.js 15, Django Channels, PostgreSQL, Neo4j, Gemini<br />{code(8, 'live ↗')}</>}>
         Sanchaalan Saathi: coordination for NGOs
       </H3>
       <P>
@@ -174,11 +190,11 @@ export default function Paper() {
         shortage show up as one problem, assigns volunteers on skill, distance and workload, and
         checks the proof-of-completion photo before closing a task <Cite n={8} />.
       </P>
-      <Figure n={5} caption="Why not just send the nearest volunteer? Nearest-first (dashed) takes the closest pair and pays for it on the rest. The Hungarian algorithm (solid, running live in your browser) minimises total distance. Drag volunteers, click empty space to add one, double-click to remove one. “Waste” is the extra distance nearest-first costs.">
-        <AssignToy />
+      <Figure n={5} caption="The operations room as a live simulation. Field reports arrive, the extracted need, headcount and location fill in, the incident drops onto the map, and volunteers travel to it on the Hungarian assignment, re-solved every time something changes. Click the map to file your own report, drag a volunteer, or turn on nearest-first to see how much extra distance it would cost.">
+        <OpsRoom />
       </Figure>
 
-      <H3 id="lpd" n="1.4" meta={<>2025<br />YOLOv8L · OpenCV · PyTorch<br />{code(10)}</>}>
+      <H3 id="lpd" n="1.4" meta={<>2025<br />YOLOv8L, OpenCV, PyTorch<br />{code(10)}</>}>
         License-plate detection at night
       </H3>
       <P>
@@ -187,11 +203,11 @@ export default function Paper() {
         climb as soon as headlights come on. Confidence thresholds that adapt to conditions, plus
         bounding-box refinement, cut low-light false positives by <Num>30%</Num> <Cite n={10} />.
       </P>
-      <Figure n={6} caption="An illustrative scene, not the trained model. Slide toward night: glare gains confidence and one threshold lets it through. Penalising detections in glary regions pushes them back below the line while the plates stay. Drag the red line on the ruler to set the threshold yourself.">
-        <ThresholdToy />
+      <Figure n={6} caption="A live traffic camera, illustrative rather than the trained model. Every car gets a tracked plate box; at night the headlights and wet road throw confident false boxes. Switch to glare-aware and they drop below the line while the plates stay. Slide toward day, drag the threshold, or click any box for its score.">
+        <TrafficCam />
       </Figure>
 
-      <H3 id="aether" n="1.5" meta={<>2026 · team of three; I built the backend and Electron shell<br />FastAPI · Transformers · faster-whisper · Electron<br />{code(11)}</>}>
+      <H3 id="aether" n="1.5" meta={<>2026, team of three; I built the backend and Electron shell<br />FastAPI, Transformers, faster-whisper, Electron<br />{code(11)}</>}>
         AETHER: which way of generating text is “best”?
       </H3>
       <P>
@@ -206,7 +222,7 @@ export default function Paper() {
         <MetricRank />
       </Figure>
 
-      <H3 id="nyaaya" n="1.6" meta={<>2025<br />Gemini API · Gradio<br />{code(9)}</>}>
+      <H3 id="nyaaya" n="1.6" meta={<>2025<br />Gemini API, Gradio<br />{code(9)}</>}>
         NyaayaBot: a legal assistant that cites
       </H3>
       <P>
@@ -223,7 +239,7 @@ export default function Paper() {
               <a href={a.href} target="_blank" rel="noreferrer" className="group flex flex-wrap items-baseline gap-x-3 py-2.5">
                 <span className="font-mono text-[11px] text-mute">{a.year}</span>
                 <span className="text-[17px] group-hover:text-signal">{a.name}</span>
-                <span className="text-[15px] text-mute">— {a.what}</span>
+                <span className="text-[15px] text-mute">{a.what}</span>
               </a>
             </li>
           ))}
@@ -297,13 +313,13 @@ export default function Paper() {
           <a href={lc.href} target="_blank" rel="noreferrer" className="group block rounded-xl border border-rule-2 bg-paper p-4 transition-colors hover:border-ink">
             <p className="font-mono text-[11px] text-mute">LeetCode</p>
             <p className="mt-1 text-[2.6rem] leading-none">{lc.rating}</p>
-            <p className="mt-1 font-mono text-[11px] text-mute">contest rating · top {lc.top}</p>
-            <div className="mt-4 flex h-2 w-full" title={`${lc.easy} easy · ${lc.medium} medium · ${lc.hard} hard`}>
+            <p className="mt-1 font-mono text-[11px] text-mute">contest rating, top {lc.top}</p>
+            <div className="mt-4 flex h-2 w-full" title={`${lc.easy} easy, ${lc.medium} medium, ${lc.hard} hard`}>
               <span className="bg-ink/25" style={{ width: `${(lc.easy / lc.solved) * 100}%` }} />
               <span className="bg-ink" style={{ width: `${(lc.medium / lc.solved) * 100}%` }} />
               <span className="bg-signal" style={{ width: `${(lc.hard / lc.solved) * 100}%` }} />
             </div>
-            <p className="mt-1.5 font-mono text-[11px] text-ink-2">{lc.solved} solved · {lc.easy} E · {lc.medium} M · {lc.hard} H</p>
+            <p className="mt-1.5 font-mono text-[11px] text-ink-2">{lc.solved} solved, {lc.easy} E, {lc.medium} M, {lc.hard} H</p>
           </a>
           <a href={competitive.codeforces.href} target="_blank" rel="noreferrer" className="group block rounded-xl border border-rule-2 bg-paper p-4 transition-colors hover:border-ink">
             <p className="font-mono text-[11px] text-mute">Codeforces</p>

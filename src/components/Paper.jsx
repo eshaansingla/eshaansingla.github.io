@@ -39,7 +39,21 @@ function ResultsTable() {
       <div className="mb-4 overflow-x-auto pb-1">
         <Seg size="sm" label="Filter results" value={filter} onChange={setFilter} options={groups} />
       </div>
-      <div className="overflow-x-auto">
+      <ul className="space-y-2 sm:hidden">
+        {rows.map(([proj, m, v, base, id]) => (
+          <li key={proj + m}>
+            <button onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })} className="w-full rounded-xl border border-rule px-3.5 py-3 text-left transition-colors active:bg-paper">
+              <span className="flex items-baseline justify-between gap-3">
+                <span className="font-mono text-[11px] text-mute">{proj}</span>
+                <span className="font-mono text-[15px] text-ink">{v}</span>
+              </span>
+              <span className="mt-1 block text-[15.5px] leading-snug">{m}</span>
+              {base && <span className="mt-0.5 block font-mono text-[11px] text-mute">against {base}</span>}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="hidden overflow-x-auto sm:block">
         <table className="w-full min-w-[560px] border-collapse text-left">
           <caption className="mb-2 caption-top text-left text-[15px] italic text-ink-2">
             <span className="mr-3 font-mono text-[12px] not-italic uppercase tracking-wider text-signal">Table 1</span>
@@ -135,10 +149,10 @@ export default function Paper() {
         where I have real numbers the figure uses them. Code for all of it is on GitHub <Cite n={1} />.
       </P>
 
-      <H3 id="icp" n="1.1" meta={<>Capstone, 2025–26, ongoing<br />Team of five; I led the ML and worked on data collection<br />ESP32, XGBoost, scikit-learn, SciPy, Flask<br />{code(5)}</>}>
+      <H3 id="icp" n="1.1" meta={<>Capstone, 2025–26, ongoing<br />Team of five; I led the ML and worked on data collection<br />ESP32, XGBoost, scikit-learn, SciPy, Flask<br />Parts about Rs 1,934, budget Rs 5,000<br />{code(5)}</>}>
         Pran: reading pressure changes through the eardrum
       </H3>
-      <P note={<>Parts about Rs 1,934<br />against a Rs 5,000 budget</>}>
+      <P>
         Intracranial pressure is normally measured with a probe through the skull. Our capstone
         asked a smaller question first: can a laser aimed at the eardrum, read by four
         photodiodes inside an over-ear headphone, see a pressure change at all? An ESP32 samples
@@ -165,10 +179,10 @@ export default function Paper() {
         <AuditFig />
       </Figure>
 
-      <H3 id="finx" n="1.2" meta={<>2026, live<br />FastAPI, PostgreSQL, WebSockets, React, Groq, OpenAI<br />{code(6, 'live ↗')}, {code(7)}</>}>
+      <H3 id="finx" n="1.2" meta={<>2026, live; spelled FIN-X, said “Phoenix”<br />FastAPI, PostgreSQL, WebSockets, React, Groq, OpenAI<br />{code(6, 'live ↗')}, {code(7)}</>}>
         FIN-X: real-time market intelligence for the NSE
       </H3>
-      <P note="Spelled FIN-X, said “Phoenix”.">
+      <P>
         Retail investors can see institutional bulk and block deals, but rarely what they mean.
         FIN-X streams NSE data over WebSockets and explains it in plain language <Cite n={6} />. In its
         first month it had <Num>100+</Num> active users and <Num>5,000+</Num> requests a day.

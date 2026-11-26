@@ -7,6 +7,7 @@ import { viteSingleFile } from 'vite-plugin-singlefile'
 export default defineConfig({
   plugins: [react(), tailwindcss(), viteSingleFile()],
   base: './',
+  define: { __BUILD_DATE__: JSON.stringify(new Date().toISOString()) },
   publicDir: false,
   build: { outDir: 'dist-single', assetsInlineLimit: 100_000_000, cssCodeSplit: false },
 })

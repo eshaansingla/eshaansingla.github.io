@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { motion, useScroll, useSpring, useTransform } from 'framer-motion'
+import { useEffect, useRef, useState } from 'react'
+import { AnimatePresence, motion, useScroll, useSpring, useTransform } from 'framer-motion'
 import { useTheme } from '../theme'
 import { profile } from '../data'
 
@@ -85,10 +85,11 @@ export default function Header() {
               {label}
             </a>
           ))}
-          <a href={profile.resume} download className="ml-1 hidden rounded-full border border-ink/30 px-3 py-1.5 transition-colors hover:border-ink hover:bg-ink hover:text-canvas min-[400px]:inline">
+          <a href={profile.resume} download className="ml-1 hidden rounded-full border border-ink/30 px-3 py-1.5 transition-colors hover:border-ink hover:bg-ink hover:text-canvas sm:inline">
             résumé.pdf ↓
           </a>
           <ThemeSwitch />
+          <MobileMenu active={active} />
         </nav>
       </div>
       <div className="relative h-3 w-full" aria-hidden="true">
@@ -100,5 +101,53 @@ export default function Header() {
         </motion.div>
       </div>
     </header>
+  )
+}
+
+/** Phones: sections, résumé and mail in one tap-friendly sheet. */
+function MobileMenu({ active }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  useEffect(() => {
+    if (!open) return
+    const key = (e) => e.key === 'Escape' && setOpen(false)
+    const down = (e) => ref.current && !ref.current.contains(e.target) && setOpen(false)
+    addEventListener('keydown', key)
+    addEventListener('pointerdown', down)
+    return () => { removeEventListener('keydown', key); removeEventListener('pointerdown', down) }
+  }, [open])
+  return (
+    <div ref={ref} className="relative sm:hidden">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-label={open ? 'Close menu' : 'Open menu'}
+        className="grid h-9 w-9 place-items-center rounded-full border border-ink/20 text-ink"
+      >
+        <svg viewBox="0 0 16 16" className="h-4 w-4" aria-hidden="true">
+          <path d={open ? 'M3 3 L13 13 M13 3 L3 13' : 'M2 4.5 H14 M2 8 H14 M2 11.5 H14'} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            transition={{ duration: 0.18 }}
+            className="absolute right-0 top-11 w-56 origin-top-right rounded-2xl border border-ink/10 bg-canvas p-2 shadow-[0_18px_40px_-16px_rgb(0_0_0/0.4)]"
+          >
+            {LINKS.map(([id, label]) => (
+              <a key={id} href={`#${id}`} onClick={() => setOpen(false)} className={`block rounded-xl px-3 py-2.5 font-mono text-[13px] ${active === id ? 'text-signal' : 'text-ink'} active:bg-ink/5`}>
+                {label}
+              </a>
+            ))}
+            <div className="my-1.5 h-px bg-rule" />
+            <a href={profile.resume} download onClick={() => setOpen(false)} className="block rounded-xl px-3 py-2.5 font-mono text-[13px] text-ink active:bg-ink/5">résumé.pdf ↓</a>
+            <a href={`mailto:${profile.email}?subject=${encodeURIComponent('Hello Eshaan')}`} onClick={() => setOpen(false)} className="block rounded-xl px-3 py-2.5 font-mono text-[13px] text-signal active:bg-ink/5">Mail me ↗</a>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   )
 }

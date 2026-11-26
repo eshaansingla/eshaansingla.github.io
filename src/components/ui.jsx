@@ -3,12 +3,14 @@ import { refs } from '../data'
 import { EASE, useSeen } from './kit'
 
 /** Body row: main text column + margin note (sidenote on wide screens, inline note on small). */
-export function Row({ children, note, className = '' }) {
+export function Row({ children, note, className = '', hang = false }) {
   return (
     <div className={`mx-auto grid max-w-[1040px] gap-x-12 px-5 md:px-8 xl:grid-cols-[660px_1fr] ${className}`}>
       <div>{children}</div>
       {note ? (
-        <aside className="mt-3 border-l border-signal/60 pl-3 font-mono text-[12px] leading-[1.6] text-mute xl:mt-1.5">{note}</aside>
+        <aside className={`mt-3 font-mono text-[12px] leading-[1.6] text-mute xl:mt-1.5 ${hang ? 'xl:relative xl:z-10 xl:h-0 xl:overflow-visible' : ''}`}>
+          <div className="border-l border-signal/60 pl-3">{note}</div>
+        </aside>
       ) : (
         <div className="hidden xl:block" />
       )}
@@ -73,7 +75,7 @@ export function H2({ id, n, children }) {
 
 export function H3({ id, n, children, meta }) {
   return (
-    <Row className="mb-3 mt-16" note={meta}>
+    <Row className="mb-3 mt-16" note={meta} hang>
       <h3 id={id} className="text-[1.45rem] font-medium leading-snug tracking-[-0.01em]">
         <span className="mr-3 font-mono text-[0.6em] text-mute">{n}</span>
         {children}

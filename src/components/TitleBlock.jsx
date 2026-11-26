@@ -3,6 +3,8 @@ import { Row, Num } from './ui'
 import { profile, profileLinks } from '../data'
 
 const EASE = [0.22, 1, 0.36, 1]
+// set at build time, so every deploy carries its own date
+const REVISED = new Date(__BUILD_DATE__).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })
 
 export default function TitleBlock() {
   return (
@@ -12,7 +14,7 @@ export default function TitleBlock() {
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6 }}
           className="font-mono text-[11.5px] text-mute"
         >
-          Working paper, revised 26 Nov 2026, Patiala
+          Working paper, revised {REVISED}, Patiala
         </motion.p>
         <motion.h1
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: EASE, delay: 0.1 }}

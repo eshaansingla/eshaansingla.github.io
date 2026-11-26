@@ -36,17 +36,15 @@ const PARTS = {
   btn: { name: 'Push-button, GPIO 15', role: 'Marks the Valsalva window. In these recordings session_label numbers each session: 0 supine, 1 head-up, 2 head-down, 3 Valsalva.', cost: null },
   pwr: { name: 'LiPo, TP4056, boost and regulator', role: '3.7 V battery with charging, a 3.3 V rail for logic and 5 V for the laser. The switch stops the replay.', cost: 377 + 20 + 36 + 15 },
   head: { name: 'Optical head', role: '650 nm laser about 3 cm from the ear, with four BPW34 photodiodes around it, inside an over-ear headphone cup', cost: 31 + 80 },
-  model: { name: 'Classifier', role: `The repo’s final XGBoost model scores each 10 s window. At or above ${THR.toFixed(2)} (set on validation subjects, never on test subjects) the window is called elevated.`, cost: null },
 }
 const TOTAL = 1934
-const ARM = { type: 'spring', stiffness: 90, damping: 16 }
 const COLS = ['timestamp_ms', 'ir_raw', 'red_raw', 'disp_raw', 'disp_x', 'disp_y', 'ax', 'ay', 'az', 'gx', 'gy', 'gz', 'artifact_flag', 'session_label']
 
 export default function HardwareBench() {
   const [tab, setTab] = useState('elevated')
   const [session, setSession] = useState(TABS.elevated.start)
   const [power, setPower] = useState(true)
-  const [hot, setHot] = useState('model')
+  const [hot, setHot] = useState(null)
   const [rows, setRows] = useState([])
   const T = TABS[tab]
   const rec = DATA.recordings[T.file]
@@ -113,9 +111,13 @@ export default function HardwareBench() {
     return () => { cancelAnimationFrame(raf); io.disconnect() }
   }, [])
 
-  const info = PARTS[hot]
+  const info = hot ? PARTS[hot] : null
   const strainKey = session === 3 && power
-  const cross = session === 3 // arms folded for the Valsalva session
+  const cross = session === 3 // arms folded across the chest for the Valsalva session
+  const k = useEased(cross ? 1 : 0, 950)
+  // [shoulder angle, elbow angle] in degrees, lying along the body vs folded onto the chest
+  const near = armPose([174, 212], 62, 60, [5, -1], [-2, -160], k)
+  const far = armPose([178, 207], 62, 60, [3, 0], [-6, -156], k)
   const m = SESSIONS[session]
 
   return (
@@ -135,7 +137,7 @@ export default function HardwareBench() {
       footer={
         <>
           <span>{T.who}, real CSV rows; scores from the repo’s final model</span>
-          <span className="ml-auto">tap or hover a part; about Rs {TOTAL.toLocaleString('en-IN')} in all</span>
+          <span className="ml-auto">all parts about Rs {TOTAL.toLocaleString('en-IN')}</span>
         </>
       }
     >
@@ -180,8 +182,9 @@ export default function HardwareBench() {
               {[180, 300, 420].map((x) => <line key={x} x1={x} y1="225" x2={x} y2="241" stroke="#2f5670" strokeOpacity="0.5" />)}
 
               {/* ── the dummy, supine, head to the left ── */}
-              {/* far arm, in shadow */}
-              <motion.path initial={false} animate={{ d: cross ? 'M178 208 L232 205 L232 205' : 'M178 208 L246 212 L308 210' }} transition={ARM} fill="none" stroke="#a87c12" strokeWidth="11" strokeLinecap="round" strokeLinejoin="round" />
+              {/* far arm: behind the torso until its forearm lifts clear of the body */}
+              <Limb from={far.S} to={far.E} w={12} shade />
+              {k < 0.3 && <><Limb from={far.E} to={far.H} w={10.5} shade /><circle cx={far.H[0]} cy={far.H[1]} r="6.5" fill="#c79a1e" stroke="#7a5a10" strokeWidth="0.9" /></>}
               {/* legs */}
               <path d="M344 212 L422 208" fill="none" stroke="url(#hb-limb)" strokeWidth="23" strokeLinecap="round" />
               <path d="M422 209 L488 213" fill="none" stroke="url(#hb-limb)" strokeWidth="17" strokeLinecap="round" />
@@ -196,28 +199,13 @@ export default function HardwareBench() {
                 <path d="M158 226 L158 204 C160 194 172 188 190 186 C214 182 240 183 256 188 C266 191 270 198 270 206 L270 226 Z" fill="url(#hb-chest)" stroke="#8a6612" strokeWidth="0.8" />
                 <path d="M190 192 C212 187 236 187 252 192 M196 199 C214 195 232 195 248 199 M200 206 C216 203 230 203 244 206" fill="none" stroke="#8a6612" strokeOpacity="0.3" />
               </motion.g>
-              {/* arms: alongside the body, or folded across the chest in an X for Valsalva (as in the recording sessions) */}
-              {[
-                { d: cross ? 'M174 212 L222 211' : 'M174 212 L240 217', w: 14 },
-                { d: cross ? 'M222 211 L194 182' : 'M240 217 L304 215', w: 12 },
-              ].map((l, i) => (
-                <g key={i}>
-                  <motion.path initial={false} animate={{ d: l.d }} transition={ARM} fill="none" stroke="#8a6612" strokeWidth={l.w + 1.8} strokeLinecap="round" />
-                  <motion.path initial={false} animate={{ d: l.d }} transition={ARM} fill="none" stroke="#efbd34" strokeWidth={l.w} strokeLinecap="round" />
-                  <motion.path initial={false} animate={{ d: l.d }} transition={ARM} fill="none" stroke="#ffe48a" strokeOpacity="0.7" strokeWidth={l.w * 0.28} strokeLinecap="round" transform="translate(0 -2.5)" />
-                </g>
-              ))}
-              <motion.ellipse initial={false} animate={{ cx: cross ? 190 : 312, cy: cross ? 180 : 215 }} transition={ARM} rx="9" ry="6.5" fill="#efbd34" stroke="#8a6612" strokeWidth="0.9" />
-              {/* far forearm comes over the top to complete the cross */}
-              <motion.g initial={false} animate={{ opacity: cross ? 1 : 0 }} transition={{ duration: 0.35, delay: cross ? 0.15 : 0 }}>
-                <motion.path initial={false} animate={{ d: cross ? 'M240 205 L182 196' : 'M232 205 L231 205' }} transition={ARM} fill="none" stroke="#7a5a10" strokeWidth="12" strokeLinecap="round" />
-                <motion.path initial={false} animate={{ d: cross ? 'M240 205 L182 196' : 'M232 205 L231 205' }} transition={ARM} fill="none" stroke="#d6a624" strokeWidth="10" strokeLinecap="round" />
-                <motion.ellipse initial={false} animate={{ cx: cross ? 177 : 232, cy: cross ? 195 : 205 }} transition={ARM} rx="7.5" ry="6" fill="#d6a624" stroke="#7a5a10" strokeWidth="0.9" />
-              </motion.g>
-              <Bolt x={174} y={212} r={5} />
-              <motion.g initial={false} animate={{ x: cross ? -18 : 0, y: cross ? -6 : 0 }} transition={ARM}>
-                <Bolt x={240} y={217} r={3.8} />
-              </motion.g>
+              {/* arms in front: the far forearm once it is above the body, then the near arm */}
+              {k >= 0.3 && <><Limb from={far.E} to={far.H} w={10.5} shade /><circle cx={far.H[0]} cy={far.H[1]} r="6.5" fill="#c79a1e" stroke="#7a5a10" strokeWidth="0.9" /></>}
+              <Limb from={near.S} to={near.E} w={14} />
+              <Limb from={near.E} to={near.H} w={12} />
+              <circle cx={near.H[0]} cy={near.H[1]} r="7.5" fill="#efbd34" stroke="#8a6612" strokeWidth="0.9" />
+              <Bolt x={near.S[0]} y={near.S[1]} r={5} />
+              <Bolt x={near.E[0]} y={near.E[1]} r={3.8} />
               <Bolt x={344} y={212} r={5} />
               <Bolt x={422} y={209} r={4.6} />
               <Bolt x={488} y={213} r={3.4} />
@@ -262,7 +250,7 @@ export default function HardwareBench() {
           {/* close-up of the optical head */}
           <button
             onPointerEnter={(e) => e.pointerType === 'mouse' && setHot('head')}
-            onClick={() => setHot('head')}
+            onClick={() => setHot((h) => (h === 'head' ? null : 'head'))}
             onFocus={() => setHot('head')}
             className={`relative mx-3 mb-3 flex max-w-[280px] items-stretch gap-2 rounded-xl border bg-paper/95 p-2 text-left shadow-lg backdrop-blur transition-colors sm:absolute sm:right-3 sm:top-3 sm:mx-0 sm:mb-0 sm:w-[52%] sm:max-w-[250px] ${hot === 'head' ? 'border-signal' : 'border-rule-2'}`}
           >
@@ -287,6 +275,7 @@ export default function HardwareBench() {
             <div className="flex min-w-0 flex-1 flex-col">
               <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-mute">inside the cup</p>
               <p className="mt-0.5 font-mono text-[9px] leading-tight text-ink-2">the spot follows the recorded disp_x and disp_y, magnified</p>
+              <p className="mt-1 font-mono text-[10px] text-signal">laser + 4 × BPW34, Rs 111</p>
               <p className="mt-auto font-mono text-[9px] text-mute">IR pulse, this window</p>
               <svg viewBox="0 0 300 40" preserveAspectRatio="none" className="h-8 w-full">
                 <path ref={trace} d="" fill="none" stroke="var(--signal)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
@@ -298,17 +287,37 @@ export default function HardwareBench() {
         {/* the electronics, breadboard-simulator style */}
         <div className="relative">
           <Breadboard hot={hot} setHot={setHot} power={power} label={session} setPower={setPower} ledRef={ledRef} />
+          <AnimatePresence initial={false}>
+            {info ? (
+              <motion.div
+                key={hot}
+                role="status"
+                initial={{ opacity: 0, y: -6, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, transition: { duration: 0.08 } }}
+                transition={{ duration: 0.16 }}
+                className="absolute left-2 top-2 w-[min(250px,62%)] rounded-xl border border-signal/50 bg-paper/95 p-3 shadow-lg backdrop-blur"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-mono text-[11.5px] leading-tight text-ink">{info.name}</p>
+                  <button onClick={() => setHot(null)} aria-label="Close part details" className="-mr-1 -mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-full text-mute hover:bg-ink/10 hover:text-ink">✕</button>
+                </div>
+                <p className="mt-1 font-mono text-[18px] leading-none text-signal">{info.cost ? `Rs ${info.cost}` : 'not priced in the BOM'}</p>
+                <p className="mt-1.5 text-[13px] leading-snug text-ink-2">{info.role}</p>
+              </motion.div>
+            ) : (
+              <motion.p key="hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.05 } }} className="pointer-events-none absolute left-3 top-2.5 rounded-full bg-paper/90 px-2.5 py-1 font-mono text-[10.5px] text-mute">
+                tap any part for its price
+              </motion.p>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
       {/* classifier */}
-      <Classifier rec={rec} seg={seg} session={session} setSession={setSession} elevated={elevated} who={T.who} onHover={() => setHot('model')} />
+      <Classifier rec={rec} seg={seg} session={session} setSession={setSession} elevated={elevated} who={T.who} />
 
       {/* part info */}
-      <div className="border-t border-rule px-4 py-3" aria-live="polite">
-        <p className="font-mono text-[11.5px] text-signal">{info.name}{info.cost ? <span className="text-mute">, about Rs {info.cost}</span> : null}</p>
-        <p className="mt-0.5 text-[14.5px] leading-snug text-ink-2">{info.role}</p>
-        <p ref={readout} className="mt-1.5 whitespace-pre font-mono text-[11px] text-mute"> </p>
+      <div className="border-t border-rule px-4 py-2.5">
+        <p ref={readout} className="overflow-hidden whitespace-pre font-mono text-[11px] text-mute"> </p>
       </div>
 
       {/* serial monitor */}
@@ -338,7 +347,7 @@ export default function HardwareBench() {
 }
 
 /** The verdict for the replayed window, and every window of the recording against the threshold. */
-function Classifier({ rec, seg, session, setSession, elevated, who, onHover }) {
+function Classifier({ rec, seg, session, setSession, elevated, who }) {
   const tl = rec.timeline
   const t0 = tl[0][0], t1 = tl[tl.length - 1][0]
   const x = (t) => ((t - t0) / (t1 - t0)) * 100
@@ -347,7 +356,7 @@ function Classifier({ rec, seg, session, setSession, elevated, who, onHover }) {
     return { s, a: x(ws[0][0]), b: x(ws[ws.length - 1][0]) }
   })
   return (
-    <div className="grid gap-4 border-t border-rule px-4 py-4 md:grid-cols-[230px_minmax(0,1fr)]" onPointerEnter={(e) => e.pointerType === 'mouse' && onHover()} onClick={onHover}>
+    <div className="grid gap-4 border-t border-rule px-4 py-4 md:grid-cols-[230px_minmax(0,1fr)]">
       <div>
         <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-mute">This window</p>
         <AnimatePresence mode="wait">
@@ -395,6 +404,44 @@ function Classifier({ rec, seg, session, setSession, elevated, who, onHover }) {
         <p className="mt-1.5 font-mono text-[10.5px] leading-snug text-mute">Orange bars cross the threshold. The replayed window is the session’s median-scoring one, not a hand-picked example.</p>
       </div>
     </div>
+  )
+}
+
+const lerp = (a, b, t) => a + (b - a) * t
+/** Shoulder at S; upper arm L1 at angle a, forearm L2 bent by f at the elbow. */
+function armPose(S, L1, L2, down, up, k) {
+  const r = Math.PI / 180, a = lerp(down[0], up[0], k), f = lerp(down[1], up[1], k)
+  const E = [S[0] + L1 * Math.cos(a * r), S[1] + L1 * Math.sin(a * r)]
+  return { S, E, H: [E[0] + L2 * Math.cos((a + f) * r), E[1] + L2 * Math.sin((a + f) * r)] }
+}
+/** Ease a number toward a target (cubic in-out), for poses drawn from plain geometry. */
+function useEased(target, ms) {
+  const [v, setV] = useState(target)
+  const cur = useRef(target)
+  useEffect(() => {
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+    const from = cur.current, t0 = performance.now()
+    let raf
+    const step = (now) => {
+      const p = reduced ? 1 : Math.min(1, (now - t0) / ms)
+      cur.current = from + (target - from) * (p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 2)
+      setV(cur.current)
+      if (p < 1) raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [target, ms])
+  return v
+}
+/** One limb segment: outline, body colour and a highlight along the top. */
+function Limb({ from, to, w, shade = false }) {
+  const d = `M${from[0]} ${from[1]} L${to[0]} ${to[1]}`
+  return (
+    <g>
+      <path d={d} stroke={shade ? '#7a5a10' : '#8a6612'} strokeWidth={w + 1.8} strokeLinecap="round" />
+      <path d={d} stroke={shade ? '#c79a1e' : '#efbd34'} strokeWidth={w} strokeLinecap="round" />
+      <path d={d} stroke="#ffe48a" strokeOpacity={shade ? 0.35 : 0.7} strokeWidth={w * 0.28} strokeLinecap="round" transform="translate(0 -2.4)" />
+    </g>
   )
 }
 

@@ -209,7 +209,7 @@ export default function Paper() {
         shortage show up as one problem, assigns volunteers on skill, distance and workload, and
         checks the proof-of-completion photo before closing a task <Cite n={8} />.
       </P>
-      <Figure n={4} caption="The operations room as a live simulation on a street map. A field report arrives, the need, headcount and area are read from it, and the incident drops onto the map. Volunteers then drive to it by road on the Hungarian assignment, re-solved whenever anything changes. A debris report closes its road until it is cleared, so routes detour round it and the river can only be crossed at the bridges. Click a road to file a report, drag the map or a volunteer, zoom in, or turn on nearest-first to see how much further it would drive.">
+      <Figure n={4} caption="The operations room as a live simulation on a street map. A field report arrives, the need, headcount and area are read from it, and the incident drops onto the map. Volunteers then drive to it by road on the Hungarian assignment, re-solved whenever anything changes. A debris report closes its road until it is cleared, so routes detour round it and the river can only be crossed at the bridges. Tap a street to file a report, drag a volunteer, or turn on nearest-first to see how much further it would drive. Zoom out from a single street through the city and Punjab to all of India and back, by pinch, double-tap or Ctrl + scroll.">
         <OpsRoom />
       </Figure>
 
@@ -222,7 +222,7 @@ export default function Paper() {
         climb as soon as headlights come on. Confidence thresholds that adapt to conditions, plus
         bounding-box refinement, cut low-light false positives by <Num>30%</Num> <Cite n={10} />.
       </P>
-      <Figure n={5} caption="A live camera over both carriageways, illustrative rather than the trained model, with made-up plates. Cars driving away are read from the rear plate and oncoming cars from the front, and each plate the detector keeps gets a magnified crop beside it. At night headlights, tail lights and the wet road throw confident false boxes; switch to glare-aware and they drop below the line while the plates stay. Slide toward day, drag the threshold, or click any box for its score.">
+      <Figure n={5} caption="A live camera over both carriageways, illustrative rather than the trained model, with made-up plates. Cars driving away are read from the rear plate and oncoming cars from the front; each plate shows on the car and, once the detector keeps it, in a magnified crop beside the car. At night headlights, tail lights and the wet road throw confident false boxes; switch to glare-aware and they drop below the line while the plates stay. Slide toward day, drag the threshold, or click any box for its score.">
         <TrafficCam />
       </Figure>
 

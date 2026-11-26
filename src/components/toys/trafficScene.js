@@ -384,7 +384,7 @@ function drawPlate(ctx, text, pl, light, s) {
   ctx.strokeStyle = '#141414'
   ctx.lineWidth = 0.9
   rr(ctx, pl.x + 1, pl.y + 1, pl.w - 2, pl.h - 2, 1); ctx.stroke()
-  if (s * pl.h < 9) return
+  if (s * pl.h < 6.5) return // draw the characters once they would be legible on screen
   ctx.fillStyle = '#111'
   ctx.font = '700 9.6px "JetBrains Mono Variable", ui-monospace, monospace'
   ctx.textAlign = 'center'
@@ -426,16 +426,24 @@ export function drawCrops(ctx, crops, W, H, now) {
     const k = Math.min(1, (now - born) / 0.25)
     const e = 1 - (1 - k) ** 3
     const [bx, by, bw, bh] = det.box
-    const cw = Math.max(Math.min(124, W * 0.3), Math.min(156, bw * 2.4)), chh = cw * 0.3
-    let cx = bx + bw / 2 + (dir > 0 ? 1 : -1) * (geo.width * 0.32)
-    let cy = dir > 0 ? by + bh + 14 : by - geo.width * 0.62 - chh
+    const cw = Math.max(Math.min(92, W * 0.22), Math.min(118, bw * 1.8)), chh = cw * 0.3
+    const boxH = chh + 24 // plate plus caption
+    // beside the car, on the outside of its lane, level with the plate; above the roof if there is no room
+    const out = dir > 0 ? 1 : -1
+    const side = bx + bw / 2 + out * (geo.width / 2 + 14 + cw / 2)
+    const roomy = side - cw / 2 - 5 > 6 && side + cw / 2 + 5 < W - 6
+    let cx = roomy ? side : bx + bw / 2
+    let cy = roomy ? by + bh / 2 - boxH / 2 + 5 : by - geo.width * 0.75 - boxH
     cx = Math.max(cw / 2 + 10, Math.min(W - cw / 2 - 10, cx))
-    cy = Math.max(34, Math.min(H - chh - 40, cy))
+    cy = Math.max(34, Math.min(H - boxH - 30, cy))
     // leader from the plate box to the crop
     ctx.globalAlpha = e
     ctx.strokeStyle = 'rgba(255,106,44,0.75)'
     ctx.lineWidth = 1
-    ctx.beginPath(); ctx.moveTo(bx + bw / 2, dir > 0 ? by + bh : by); ctx.lineTo(cx, dir > 0 ? cy : cy + chh + 14); ctx.stroke()
+    ctx.beginPath()
+    if (roomy) { ctx.moveTo(out > 0 ? bx + bw : bx, by + bh / 2); ctx.lineTo(cx - out * (cw / 2 + 5), cy + chh / 2) }
+    else { ctx.moveTo(bx + bw / 2, by); ctx.lineTo(cx, cy + boxH - 5) }
+    ctx.stroke()
     ctx.save()
     ctx.translate(cx, cy + chh / 2)
     ctx.scale(0.85 + 0.15 * e, 0.85 + 0.15 * e)
@@ -461,7 +469,7 @@ export function drawCrops(ctx, crops, W, H, now) {
     ctx.font = '600 9.5px "JetBrains Mono Variable", ui-monospace, monospace'
     ctx.fillStyle = '#ff6a2c'
     ctx.textAlign = 'left'
-    ctx.fillText(`#${det.car} ${dir > 0 ? 'oncoming' : 'outgoing'}`, -cw / 2, chh / 2 + 13)
+    ctx.fillText(`#${det.car} ${dir > 0 ? 'front' : 'rear'}`, -cw / 2, chh / 2 + 13)
     ctx.textAlign = 'right'
     ctx.fillText(det.conf.toFixed(2), cw / 2, chh / 2 + 13)
     ctx.textAlign = 'left'

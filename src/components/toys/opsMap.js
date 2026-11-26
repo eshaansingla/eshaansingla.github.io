@@ -4,8 +4,32 @@
  * Map units: 760 × 420, 1 unit ≈ 5 m.
  */
 
+import GEO from '../../assets/geo_india.json'
+
 export const MW = 760, MH = 420
 export const M_PER_UNIT = 5
+
+// The ops map is centred on Patiala; everything else is placed with a local equirectangular projection.
+const LON0 = 76.3869, LAT0 = 30.3398
+const UX = (111320 * Math.cos((LAT0 * Math.PI) / 180)) / M_PER_UNIT, UY = 110574 / M_PER_UNIT
+export const ll = (lon, lat) => [MW / 2 + (lon - LON0) * UX, MH / 2 - (lat - LAT0) * UY]
+const INDIA = GEO.india.map((r) => r.map(([lo, la]) => ll(lo, la)))
+const PUNJAB = GEO.punjab.map((r) => r.map(([lo, la]) => ll(lo, la)))
+export const WORLD = (() => {
+  const xs = INDIA.flat().map((p) => p[0]), ys = INDIA.flat().map((p) => p[1])
+  return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) }
+})()
+const PUNJAB_CITIES = [
+  ['Ludhiana', 75.857, 30.901], ['Amritsar', 74.872, 31.634], ['Jalandhar', 75.576, 31.326], ['Bathinda', 74.951, 30.211],
+  ['Mohali', 76.717, 30.704], ['Pathankot', 75.652, 32.264], ['Firozpur', 74.613, 30.925], ['Sangrur', 75.844, 30.245],
+  ['Hoshiarpur', 75.911, 31.532], ['Moga', 75.171, 30.817],
+].map(([n, lo, la]) => [n, ...ll(lo, la)])
+const INDIA_CITIES = [
+  ['New Delhi', 77.209, 28.614], ['Mumbai', 72.878, 19.076], ['Kolkata', 88.364, 22.573], ['Chennai', 80.271, 13.083],
+  ['Bengaluru', 77.595, 12.972], ['Hyderabad', 78.487, 17.385], ['Ahmedabad', 72.571, 23.023], ['Jaipur', 75.787, 26.912],
+  ['Lucknow', 80.946, 26.847],
+].map(([n, lo, la]) => [n, ...ll(lo, la)])
+const NEIGHBOURS = [['HARYANA', 76.1, 29.25], ['HIMACHAL PRADESH', 77.15, 31.95], ['RAJASTHAN', 74.0, 27.6], ['JAMMU AND KASHMIR', 75.0, 33.3]].map(([n, lo, la]) => [n, ...ll(lo, la)])
 
 export function mulberry(a) {
   return () => {
@@ -158,15 +182,14 @@ const PALETTE = {
 }
 
 /** Base map: land, river, park, buildings, roads with casing, bridges, closures, labels, POIs. */
+export const landColor = (dark) => (dark ? PALETTE.dark : PALETTE.light).land
+
 export function drawMap(ctx, dark, closed, k) {
   const P = dark ? PALETTE.dark : PALETTE.light
-  ctx.fillStyle = P.land
-  ctx.fillRect(-MW, -MH, MW * 3, MH * 3)
-
-  // river
+  // river, carried well beyond the mapped streets
   ctx.beginPath()
-  for (let x = -20; x <= MW + 20; x += 10) ctx.lineTo(x, riverY(x) - 17)
-  for (let x = MW + 20; x >= -20; x -= 10) ctx.lineTo(x, riverY(x) + 17)
+  for (let x = -MW * 6; x <= MW * 7; x += 10) ctx.lineTo(x, riverY(x) - 17)
+  for (let x = MW * 7; x >= -MW * 6; x -= 10) ctx.lineTo(x, riverY(x) + 17)
   ctx.closePath()
   ctx.fillStyle = P.water
   ctx.fill()
@@ -206,7 +229,14 @@ export function drawMap(ctx, dark, closed, k) {
       else { seg(x, -20, x, YS[2]); seg(x, YS[3], x, MH + 20) }
     })
   }
+  // the wider city: arterials continue out of the mapped streets
   ctx.lineCap = 'butt'
+  ;[0, 1].forEach((pass) => {
+    ctx.strokeStyle = pass ? P.art : P.artCase
+    ctx.lineWidth = 11 - (pass ? 2.4 : 0)
+    ARTERIAL.row.forEach((j) => { seg(-MW * 6, YS[j], -20, YS[j]); seg(MW + 20, YS[j], MW * 7, YS[j]) })
+    ARTERIAL.col.forEach((i) => { seg(XS[i], -MH * 6, XS[i], -20); seg(XS[i], MH + 20, XS[i], MH * 7) })
+  })
   strokeRoads(0)
   strokeRoads(1)
   BRIDGES.forEach((i) => {
@@ -227,7 +257,8 @@ export function drawMap(ctx, dark, closed, k) {
     ctx.setLineDash([])
   })
 
-  // labels scale down as the map zooms so they stay the same size on screen
+  // labels scale down as the map zooms so they stay the same size on screen; only once the streets are readable
+  if (k < 0.35) return
   const f = (px, w = 500) => `${w} ${px / k}px "JetBrains Mono Variable", ui-monospace, monospace`
   ctx.fillStyle = P.label
   ctx.font = f(8.5)
@@ -268,4 +299,44 @@ function drawPoi(ctx, p, dark, k) {
   ctx.font = `500 ${8.5 / k}px "JetBrains Mono Variable", ui-monospace, monospace`
   ctx.textAlign = 'center'
   ctx.fillText(p.name, p.x, p.y + r + 10 / k)
+}
+
+/** State and country layer: India's outline, Punjab, cities, neighbouring states, and where the ops map sits. */
+export function drawGeo(ctx, dark, k, signal) {
+  const P = dark ? PALETTE.dark : PALETTE.light
+  const f = (px, w = 500) => `${w} ${px / k}px "JetBrains Mono Variable", ui-monospace, monospace`
+  const ring = (r) => { ctx.beginPath(); r.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath() }
+  ctx.fillStyle = dark ? '#2a2a2d' : '#dcd6ca'
+  ctx.fillRect(WORLD.x0 - 4e5, WORLD.y0 - 4e5, WORLD.x1 - WORLD.x0 + 8e5, WORLD.y1 - WORLD.y0 + 8e5)
+  INDIA.forEach((r) => { ring(r); ctx.fillStyle = P.land; ctx.fill(); ctx.strokeStyle = dark ? '#6b6560' : '#9a9183'; ctx.lineWidth = 1.2 / k; ctx.stroke() })
+  PUNJAB.forEach((r) => { ring(r); ctx.fillStyle = signal + '1f'; ctx.fill(); ctx.strokeStyle = signal; ctx.lineWidth = 1.4 / k; ctx.stroke() })
+  ctx.textAlign = 'center'
+  const dot = (x, y, r, fill) => { ctx.beginPath(); ctx.arc(x, y, r / k, 0, 7); ctx.fillStyle = fill; ctx.fill() }
+  if (k < 0.006) {
+    ctx.fillStyle = P.area
+    ctx.font = f(15, 600)
+    ctx.fillText('I N D I A', ll(79, 22.8)[0], ll(79, 22.8)[1])
+    INDIA_CITIES.forEach(([n, x, y]) => { dot(x, y, 2.6, P.label); ctx.fillStyle = P.label; ctx.font = f(9.5); ctx.fillText(n, x, y - 6 / k) })
+  }
+  if (k >= 0.0022) {
+    ctx.fillStyle = P.area
+    ctx.font = f(11, 600)
+    const c = ll(75.4, 31.05)
+    ctx.fillText('P U N J A B', c[0], c[1])
+    ctx.font = f(8.5, 600)
+    ctx.fillStyle = P.label
+    NEIGHBOURS.forEach(([n, x, y]) => ctx.fillText(n, x, y))
+    PUNJAB_CITIES.forEach(([n, x, y]) => { dot(x, y, 2.4, P.label); ctx.font = f(9.5); ctx.fillText(n, x, y - 6 / k) })
+    if (k >= 0.006) { dot(...ll(76.779, 30.734), 2.4, P.label); ctx.font = f(9.5); ctx.fillText('Chandigarh', ll(76.779, 30.734)[0] + 32 / k, ll(76.779, 30.734)[1] + 3 / k) }
+  }
+  // the ops area and Patiala
+  ctx.strokeStyle = signal
+  ctx.lineWidth = 1.5 / k
+  ctx.strokeRect(0, 0, MW, MH)
+  if (k >= 0.006) {
+    ctx.fillStyle = signal
+    ctx.font = f(10.5, 700)
+    ctx.fillText('Patiala', MW / 2, -10 / k)
+  }
+  ctx.textAlign = 'left'
 }

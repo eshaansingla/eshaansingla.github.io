@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Device, Panel, Stat, Toggle, Tween } from '../kit'
 import { cssVar, onThemeChange } from '../../theme'
-import { MH, MW, M_PER_UNIT, POIS, areaName, drawMap, mulberry, randomRoadPoint, route, shortest, snap } from './opsMap'
+import { MH, MW, M_PER_UNIT, POIS, WORLD, areaName, drawGeo, drawMap, landColor, mulberry, randomRoadPoint, route, shortest, snap } from './opsMap'
 
 /*
  * Sanchaalan Saathi figure: the Sanchaalan Saathi operations room, as a live simulation on a street map.
@@ -14,6 +14,12 @@ import { MH, MW, M_PER_UNIT, POIS, areaName, drawMap, mulberry, randomRoadPoint,
 const KINDS = ['food supplies', 'medical camp', 'shelter', 'drinking water', 'debris clearing']
 const URG = ['low', 'medium', 'high']
 const SPEED = 62 // map units per second
+const K_MIN = 0.0011, K_MAX = 4 // all of India down to a single street corner
+const LEVELS = [[1.5, 'street'], [0.5, 'neighbourhood'], [0.06, 'city'], [0.0022, 'state'], [0, 'country']]
+const CLUSTER_K = 0.12 // below this the operation shows as one marker
+const levelOf = (k) => LEVELS.find(([m]) => k >= m)[1]
+const NICE = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000] // metres
+const clamp01 = (x) => Math.max(0, Math.min(1, x))
 const BIG = 1e7 // cost of an unreachable pair
 
 function hungarian(a) {
@@ -145,20 +151,41 @@ export default function OpsRoom() {
     // seed the board, including one blocked road
     ;[[96, 70], [372, 80], [596, 160], [520, 304], [206, 384]].forEach(([x, y], i) => addTask(snap(x, y), true, i === 3 ? 'debris clearing' : undefined))
 
-    // ── view transform (zoom about a point, pan, clamp so the map always fills the frame) ──
+    // ── view: world = ops-map units (5 m); screen (in map units) = world × k + t ──
+    let anim = null
     const clampView = () => {
+      // keep the centre of the view over India
       const v = view.current
-      v.tx = Math.min(0, Math.max(MW - MW * v.k, v.tx))
-      v.ty = Math.min(0, Math.max(MH - MH * v.k, v.ty))
+      const cx = Math.max(WORLD.x0, Math.min(WORLD.x1, (MW / 2 - v.tx) / v.k))
+      const cy = Math.max(WORLD.y0, Math.min(WORLD.y1, (MH / 2 - v.ty) / v.k))
+      v.tx = MW / 2 - cx * v.k
+      v.ty = MH / 2 - cy * v.k
     }
     const zoomAt = (k, mx = MW / 2, my = MH / 2) => {
       const v = view.current
-      const nk = Math.max(1, Math.min(3, k))
+      const nk = Math.max(K_MIN, Math.min(K_MAX, k))
       v.tx = mx - ((mx - v.tx) / v.k) * nk
       v.ty = my - ((my - v.ty) / v.k) * nk
       v.k = nk
+      anim = null
       clampView()
       setZoom(nk)
+    }
+    // smooth flight: log-interpolate the zoom, linearly the centre
+    const flyTo = (k, wx, wy, ms = 700) => {
+      const v = view.current
+      anim = { k0: v.k, k1: Math.max(K_MIN, Math.min(K_MAX, k)), c0: [(MW / 2 - v.tx) / v.k, (MH / 2 - v.ty) / v.k], c1: [wx, wy], t0: performance.now(), ms: reduced ? 1 : ms }
+    }
+    const stepAnim = (now) => {
+      if (!anim) return
+      const p = Math.min(1, (now - anim.t0) / anim.ms), e = p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 2
+      const v = view.current
+      v.k = Math.exp(Math.log(anim.k0) + (Math.log(anim.k1) - Math.log(anim.k0)) * e)
+      const cx = anim.c0[0] + (anim.c1[0] - anim.c0[0]) * e, cy = anim.c0[1] + (anim.c1[1] - anim.c0[1]) * e
+      v.tx = MW / 2 - cx * v.k
+      v.ty = MH / 2 - cy * v.k
+      setZoom(v.k)
+      if (p >= 1) anim = null
     }
 
     api.current = {
@@ -170,7 +197,8 @@ export default function OpsRoom() {
         reassign()
       },
       hit: (x, y) => {
-        const r = 14 / view.current.k
+        if (view.current.k < CLUSTER_K) return Math.hypot(x - MW / 2, y - MH / 2) < 40 / view.current.k ? { kind: 'cluster' } : null
+        const r = 14 / Math.sqrt(view.current.k)
         const v = vols.find((q) => Math.hypot(q.x - x, q.y - y) < r)
         if (v) return { kind: 'v', v }
         const t = tasks.find((q) => q.state !== 'resolved' && Math.hypot(q.x - x, q.y - 12 / view.current.k - y) < r + 4)
@@ -180,6 +208,9 @@ export default function OpsRoom() {
       dropped: (v) => { const s = snap(v.x, v.y); v.x = s.x; v.y = s.y; v.pos = s; reassign() },
       pan: (dx, dy) => { view.current.tx += dx; view.current.ty += dy; clampView() },
       zoomAt,
+      flyTo,
+      home: () => flyTo(1, MW / 2, MH / 2),
+      detailed: () => view.current.k >= 0.25,
       linked: (t) => tasks.filter((o) => o !== t && o.state !== 'resolved' && t.kind === 'debris clearing' && o.vol && o.vol.path.length && Math.hypot(o.x - t.x, o.y - t.y) < 260).map((o) => o.id),
     }
 
@@ -240,10 +271,46 @@ export default function OpsRoom() {
     const polyline = (pts) => { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke() }
 
     const draw = (t) => {
+      stepAnim(performance.now())
       const v = view.current, k = v.k
       const sx = W / MW, sy = H / MH
+      const aCity = clamp01((k - 0.018) / 0.04) // streets, river and arterials fade in at city zoom
+      const aGeo = 1 - clamp01((k - 0.05) / 0.08) // state and country layer fades out
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      ctx.fillStyle = landColor(dark)
+      ctx.fillRect(0, 0, W, H)
       ctx.setTransform(dpr * sx * k, 0, 0, dpr * sy * k, dpr * sx * v.tx, dpr * sy * v.ty)
-      drawMap(ctx, dark, closed, k)
+      if (aGeo > 0) drawGeo(ctx, dark, k, C.signal)
+      if (aCity > 0) {
+        ctx.globalAlpha = aCity
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+        ctx.fillStyle = landColor(dark)
+        ctx.fillRect(0, 0, W, H)
+        ctx.setTransform(dpr * sx * k, 0, 0, dpr * sy * k, dpr * sx * v.tx, dpr * sy * v.ty)
+        drawMap(ctx, dark, closed, k)
+        ctx.globalAlpha = 1
+      }
+      if (k < CLUSTER_K) {
+        // far out: the whole operation collapses into one marker on Patiala
+        const open = tasks.filter((q) => q.state !== 'resolved').length
+        const r = (k < 0.006 ? 8 : 13) / k
+        ctx.fillStyle = C.signal
+        ctx.beginPath(); ctx.arc(MW / 2, MH / 2, r, 0, 7); ctx.fill()
+        if (!reduced) {
+          const ph = (t % 1.6) / 1.6
+          ctx.strokeStyle = C.signal + hex(0.6 * (1 - ph)); ctx.lineWidth = 2 / k
+          ctx.beginPath(); ctx.arc(MW / 2, MH / 2, r * (1 + ph * 1.4), 0, 7); ctx.stroke()
+        }
+        ctx.fillStyle = '#fff'
+        ctx.font = `700 ${11 / k}px "JetBrains Mono Variable", monospace`
+        ctx.textAlign = 'center'
+        if (k >= 0.006) ctx.fillText(String(open), MW / 2, MH / 2 + 4 / k)
+        ctx.fillStyle = C.ink
+        ctx.font = `600 ${9.5 / k}px "JetBrains Mono Variable", monospace`
+        if (k >= 0.006) ctx.fillText(`${open} open, ${vols.length} volunteers, tap to fly in`, MW / 2, MH / 2 + r + 13 / k)
+        ctx.textAlign = 'left'
+      }
+      if (k < CLUSTER_K) { drawOverlay(k, sx); return }
 
       // nearest-first routes, ghosted
       if (flags.current.showGreedy) {
@@ -315,18 +382,32 @@ export default function OpsRoom() {
       })
       ctx.textAlign = 'left'
 
-      // screen-space overlay: scale bar and compass
+      drawOverlay(k, sx)
+    }
+
+    // screen space: a scale bar that picks a round distance, the compass, and the zoom level
+    const drawOverlay = (k, sx) => {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      const unitPx = sx * k * (500 / M_PER_UNIT) // 500 m on screen
-      ctx.fillStyle = dark ? 'rgba(20,20,22,0.8)' : 'rgba(255,255,255,0.82)'
-      ctx.beginPath(); ctx.roundRect(10, H - 26, unitPx + 52, 18, 4); ctx.fill()
+      const mPerPx = M_PER_UNIT / (k * sx)
+      const D = NICE.find((d) => d / mPerPx >= 56) || NICE[NICE.length - 1]
+      const len = D / mPerPx
+      const label = D >= 1000 ? `${D / 1000} km` : `${D} m`
+      ctx.fillStyle = dark ? 'rgba(20,20,22,0.8)' : 'rgba(255,255,255,0.86)'
+      ctx.beginPath(); ctx.roundRect(10, H - 26, len + 60, 18, 4); ctx.fill()
       ctx.strokeStyle = C.ink; ctx.lineWidth = 1.2
-      ctx.beginPath(); ctx.moveTo(16, H - 13); ctx.lineTo(16, H - 17); ctx.moveTo(16, H - 15); ctx.lineTo(16 + unitPx, H - 15); ctx.moveTo(16 + unitPx, H - 13); ctx.lineTo(16 + unitPx, H - 17); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(16, H - 13); ctx.lineTo(16, H - 17); ctx.moveTo(16, H - 15); ctx.lineTo(16 + len, H - 15); ctx.moveTo(16 + len, H - 13); ctx.lineTo(16 + len, H - 17); ctx.stroke()
       ctx.fillStyle = C.ink
       ctx.font = '500 9.5px "JetBrains Mono Variable", monospace'
-      ctx.fillText('500 m', 22 + unitPx, H - 13)
+      ctx.fillText(label, 22 + len, H - 13)
+      const lvl = levelOf(k)
+      ctx.font = '600 9px "JetBrains Mono Variable", monospace'
+      const lw = ctx.measureText(lvl.toUpperCase()).width + 14
+      ctx.fillStyle = dark ? 'rgba(20,20,22,0.8)' : 'rgba(255,255,255,0.86)'
+      ctx.beginPath(); ctx.roundRect(10, 10, lw, 18, 9); ctx.fill()
+      ctx.fillStyle = C.signal
+      ctx.fillText(lvl.toUpperCase(), 17, 22.5)
       const cx = W - 24, cy = H - 26
-      ctx.fillStyle = dark ? 'rgba(20,20,22,0.8)' : 'rgba(255,255,255,0.82)'
+      ctx.fillStyle = dark ? 'rgba(20,20,22,0.8)' : 'rgba(255,255,255,0.86)'
       ctx.beginPath(); ctx.arc(cx, cy, 13, 0, 7); ctx.fill()
       ctx.fillStyle = C.signal
       ctx.beginPath(); ctx.moveTo(cx, cy - 9); ctx.lineTo(cx + 4, cy + 1); ctx.lineTo(cx - 4, cy + 1); ctx.fill()
@@ -335,7 +416,7 @@ export default function OpsRoom() {
       ctx.fillStyle = C.ink
       ctx.font = '700 8px "JetBrains Mono Variable", monospace'
       ctx.textAlign = 'center'
-      ctx.fillText('N', cx, cy - 13.5 + 0.5 - 2)
+      ctx.fillText('N', cx, cy - 15)
       ctx.textAlign = 'left'
     }
 
@@ -351,8 +432,11 @@ export default function OpsRoom() {
     return () => { cancelAnimationFrame(raf); ro.disconnect(); io.disconnect(); offTheme() }
   }, [])
 
-  // pointer: drag a volunteer, click an incident or volunteer for detail, drag the map to pan, click the map to file a report
+  // pointer: one finger or the mouse pans (or drags a volunteer); two fingers pinch to zoom; a tap selects or files a report
   const gesture = useRef(null)
+  const pointers = useRef(new Map())
+  const tapTimer = useRef(null)
+  const [hint, setHint] = useState(false)
   const toMap = (e) => {
     const r = canvas.current.getBoundingClientRect()
     const v = view.current
@@ -363,41 +447,91 @@ export default function OpsRoom() {
     const v = view.current
     return { left: ((x * v.k + v.tx) / MW) * 100, top: Math.min(52, ((y * v.k + v.ty) / MH) * 100 + 4) }
   }
+  const pinchState = () => {
+    const [a, b] = [...pointers.current.values()]
+    return { d: Math.hypot(a.mx - b.mx, a.my - b.my), mx: (a.mx + b.mx) / 2, my: (a.my + b.my) / 2 }
+  }
   const down = (e) => {
     if (e.target !== canvas.current) return
+    try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* capture is a nicety; gestures work without it */ }
     const p = toMap(e)
+    pointers.current.set(e.pointerId, p)
+    if (pointers.current.size === 2) {
+      // second finger: switch to pinch, drop any drag in progress
+      if (gesture.current?.h?.kind === 'v') api.current.dropped(gesture.current.h.v)
+      gesture.current = { pinch: pinchState(), k0: view.current.k, moved: true }
+      return
+    }
+    if (pointers.current.size > 2) return
     const h = api.current.hit?.(p.x, p.y)
     gesture.current = { h, start: p, last: p, moved: false }
-    e.currentTarget.setPointerCapture(e.pointerId)
   }
   const move = (e) => {
+    if (!pointers.current.has(e.pointerId)) return
+    const p = toMap(e)
+    pointers.current.set(e.pointerId, p)
     const g = gesture.current
     if (!g) return
-    const p = toMap(e)
+    if (g.pinch && pointers.current.size === 2) {
+      const now = pinchState()
+      api.current.pan(now.mx - g.pinch.mx, now.my - g.pinch.my)
+      api.current.zoomAt(g.k0 * (now.d / Math.max(10, g.pinch.d)), now.mx, now.my)
+      g.pinch = { ...now, d: g.pinch.d }
+      return
+    }
     if (Math.hypot(p.mx - g.start.mx, p.my - g.start.my) > 4) g.moved = true
     if (!g.moved) return
     if (g.h?.kind === 'v') api.current.drag(g.h.v, p.x, p.y)
     else api.current.pan(p.mx - g.last.mx, p.my - g.last.my)
     g.last = p
   }
-  const up = () => {
+  const up = (e) => {
+    pointers.current.delete(e.pointerId)
     const g = gesture.current
+    if (g?.pinch) { if (pointers.current.size === 0) gesture.current = null; return }
     gesture.current = null
     if (!g) return
     if (g.h?.kind === 'v') {
       const v = g.h.v
       if (g.moved) api.current.dropped(v)
       else setSel({ v: { id: v.id, task: v.task ? { id: v.task.id, kind: v.task.kind } : null, left: v.path.reduce((s, q, i, arr) => s + Math.hypot(q[0] - (i ? arr[i - 1][0] : v.x), q[1] - (i ? arr[i - 1][1] : v.y)), 0) }, ...panelAt(v.x, v.y) })
-    } else if (g.h?.kind === 't') {
-      if (!g.moved) setSel({ t: { ...g.h.t, vol: g.h.t.vol?.id, linked: api.current.linked(g.h.t) }, ...panelAt(g.h.t.x, g.h.t.y) })
-    } else if (!g.moved) {
-      api.current.report?.(g.start.x, g.start.y)
-      setSel(null)
+      return
     }
+    if (g.moved) return
+    if (g.h?.kind === 't') { setSel({ t: { ...g.h.t, vol: g.h.t.vol?.id, linked: api.current.linked(g.h.t) }, ...panelAt(g.h.t.x, g.h.t.y) }); return }
+    if (g.h?.kind === 'cluster') { api.current.home(); return }
+    // double tap or double click zooms in; a single tap on the street map files a report
+    if (tapTimer.current) {
+      clearTimeout(tapTimer.current); tapTimer.current = null
+      api.current.flyTo(view.current.k * 2.2, g.start.x, g.start.y, 350)
+      return
+    }
+    const at = g.start
+    tapTimer.current = setTimeout(() => {
+      tapTimer.current = null
+      if (api.current.detailed() && at.x > 0 && at.x < MW && at.y > 0 && at.y < MH) api.current.report?.(at.x, at.y)
+      setSel(null)
+    }, 260)
   }
+  const cancel = (e) => { pointers.current.delete(e.pointerId); if (!pointers.current.size) gesture.current = null }
+
+  // wheel: Ctrl/⌘ + scroll (and trackpad pinch) zooms; plain scrolling keeps scrolling the page
+  useEffect(() => {
+    const el = wrap.current
+    let t
+    const wheel = (e) => {
+      if (!(e.ctrlKey || e.metaKey)) { setHint(true); clearTimeout(t); t = setTimeout(() => setHint(false), 1400); return }
+      e.preventDefault()
+      const r = canvas.current.getBoundingClientRect()
+      const mx = ((e.clientX - r.left) / r.width) * MW, my = ((e.clientY - r.top) / r.height) * MH
+      api.current.zoomAt(view.current.k * Math.exp(-e.deltaY * 0.0045), mx, my)
+    }
+    el.addEventListener('wheel', wheel, { passive: false })
+    return () => { el.removeEventListener('wheel', wheel); clearTimeout(t) }
+  }, [])
 
   const STATUS = { extracting: 'reading the photo', open: 'on the map', waiting: 'waiting for a volunteer', assigned: 'assigned', verifying: 'on site, checking proof photo', resolved: 'resolved' }
-  const ctl = 'grid h-8 w-8 place-items-center rounded-md border border-ink/15 bg-paper/90 font-mono text-[15px] leading-none text-ink shadow-sm backdrop-blur transition-colors hover:border-ink/40 disabled:opacity-40'
+  const ctl = 'grid h-7 w-7 sm:h-8 sm:w-8 place-items-center rounded-md border border-ink/15 bg-paper/90 font-mono text-[15px] leading-none text-ink shadow-sm backdrop-blur transition-colors hover:border-ink/40 disabled:opacity-40'
 
   return (
     <Device
@@ -423,8 +557,8 @@ export default function OpsRoom() {
       }
       footer={
         <>
-          <span>click a road to file a report</span>
-          <span>drag the map to pan, drag a volunteer to move them</span>
+          <span>tap a street to file a report</span>
+          <span>drag to pan; pinch, double-tap or Ctrl + scroll to zoom, street to all of India</span>
           <span className="ml-auto">routes re-solved on every change</span>
         </>
       }
@@ -432,19 +566,27 @@ export default function OpsRoom() {
       <div className="grid md:grid-cols-[minmax(0,1fr)_270px]">
         <div
           ref={wrap}
-          className={`relative aspect-[760/420] w-full touch-none select-none overflow-hidden ${zoom > 1 ? 'cursor-grab active:cursor-grabbing' : ''}`}
+          className="relative aspect-[760/420] w-full cursor-grab touch-none select-none overflow-hidden active:cursor-grabbing"
           onPointerDown={down}
           onPointerMove={move}
           onPointerUp={up}
-          onPointerCancel={() => (gesture.current = null)}
+          onPointerCancel={cancel}
           data-cursor
         >
           <canvas ref={canvas} className="absolute inset-0 h-full w-full" role="img" aria-label="Street map with incidents, closed roads and volunteers driving to them" />
-          <div className="absolute right-2.5 top-2.5 flex flex-col gap-1.5">
-            <button className={ctl} aria-label="Zoom in" disabled={zoom >= 3} onClick={() => api.current.zoomAt(view.current.k * 1.5)}>+</button>
-            <button className={ctl} aria-label="Zoom out" disabled={zoom <= 1} onClick={() => api.current.zoomAt(view.current.k / 1.5)}>−</button>
-            <button className={`${ctl} text-[11px]`} aria-label="Reset view" disabled={zoom <= 1} onClick={() => api.current.zoomAt(1)}>⌂</button>
+          <div className="absolute right-2 top-2 flex gap-1.5 sm:right-2.5 sm:top-2.5 sm:flex-col">
+            <button className={ctl} aria-label="Zoom in" disabled={zoom >= K_MAX} onClick={() => api.current.flyTo(view.current.k * 2, (MW / 2 - view.current.tx) / view.current.k, (MH / 2 - view.current.ty) / view.current.k, 300)}>+</button>
+            <button className={ctl} aria-label="Zoom out" disabled={zoom <= K_MIN} onClick={() => api.current.flyTo(view.current.k / 2, (MW / 2 - view.current.tx) / view.current.k, (MH / 2 - view.current.ty) / view.current.k, 300)}>−</button>
+            <button className={`${ctl} text-[11px]`} aria-label="Reset view" disabled={Math.abs(zoom - 1) < 0.01} onClick={() => api.current.home()}>⌂</button>
+            <button className={`${ctl} text-[9.5px]`} aria-label="Zoom out to India" onClick={() => api.current.flyTo(0.0016, (WORLD.x0 + WORLD.x1) / 2, (WORLD.y0 + WORLD.y1) / 2, 900)}>IN</button>
           </div>
+          <AnimatePresence>
+            {hint && (
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="pointer-events-none absolute inset-x-0 top-1/2 mx-auto w-fit -translate-y-1/2 rounded-full bg-ink/80 px-3 py-1.5 font-mono text-[11px] text-canvas">
+                Ctrl or ⌘ + scroll to zoom, or pinch
+              </motion.p>
+            )}
+          </AnimatePresence>
           <Panel
             open={!!sel}
             onClose={closeSel}

@@ -45,14 +45,10 @@ const INFO = {
     rows: [['head-up 30°', '−0.04, 36% rose'], ['supine', 'baseline'], ['head-down 10°', '+0.24, 99% rose'], ['Valsalva', '+1.19, 100% rose'], ['volunteers', '146']],
     text: 'Optical slow-wave power against each volunteer’s own supine baseline, in baseline SD units (repo: docs/HARDWARE_RESULTS.md). Head-down and Valsalva rise in almost every subject; Valsalva rises in all 146.',
   },
-  feed: {
-    title: 'Tick feed',
-    rows: [['render budget', '< 200 ms'], ['load', 'two-phase'], ['source', 'simulated']],
-    text: 'FIN-X loads the last price first, then streams the rest over WebSockets that adjust to Indian market hours.',
-  },
 }
 
-export default function Monitor({ mode, setMode, man, setMan }) {
+export default function Monitor({ man, setMan }) {
+  const mode = 'physio'
   const [strain, setStrain] = useState(false)
   const [panel, setPanel] = useState(null)
   const readoutRef = useRef(null)
@@ -68,14 +64,12 @@ export default function Monitor({ mode, setMode, man, setMan }) {
       const r = document.getElementById('fig-1')?.getBoundingClientRect()
       if (!r || r.bottom < 0 || r.top > innerHeight) return
       e.preventDefault()
-      setMode('physio')
       setStrain(true)
     }
     const pick = (e) => {
       if (e.target !== document.body || !['Digit1', 'Digit2', 'Digit3', 'Digit4'].includes(e.code)) return
       const r = document.getElementById('fig-1')?.getBoundingClientRect()
       if (!r || r.bottom < 0 || r.top > innerHeight) return
-      setMode('physio')
       setMan(MANOEUVRES[+e.code.slice(-1) - 1].id)
     }
     addEventListener('keydown', pick)
@@ -83,7 +77,7 @@ export default function Monitor({ mode, setMode, man, setMan }) {
     addEventListener('keydown', down)
     addEventListener('keyup', up)
     return () => { removeEventListener('keydown', down); removeEventListener('keydown', pick); removeEventListener('keyup', up) }
-  }, [setMode, setMan])
+  }, [setMan])
 
   const press = (e) => {
     if (!hold) return
@@ -103,27 +97,17 @@ export default function Monitor({ mode, setMode, man, setMan }) {
         { id: 'ratio', label: 'P2 / P1', live: true, unit: active.idx > 0.1 ? 'rising' : 'baseline' },
         { id: 'state', label: active.label, value: fmtIdx(active.idx), unit: active.id === 'supine' ? 'reference' : `SD vs supine, rose in ${active.rise}`, bar: true },
       ]
-    : [
-        { id: 'feed', label: 'Feed', value: 'NSE', unit: 'sim' },
-        { id: 'ratio', label: 'Δ open', live: true, unit: 'intraday' },
-        { id: 'feed', label: 'Render', value: '<200', unit: 'ms' },
-      ]
+    : []
 
   return (
     <Device
       className="dark"
       name="PRAN-01"
-      sub={hold ? `tympanic optical + PPG, ch1, ${active.note}` : 'NSE tick stream, ch2'}
+      sub={hold ? `tympanic optical + PPG, ch1, ${active.note}` : ''}
       status="live"
       statusLabel="sim"
       toolbar={
         <>
-          <Seg
-            label="Channel"
-            value={mode}
-            onChange={(v) => { setMode(v); if (v === 'market') setStrain(false); setPanel(null) }}
-            options={[['physio', 'ch1 eardrum/PPG'], ['market', 'ch2 NSE ticks']]}
-          />
           <AnimatePresence>
             {hold && (
               <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} className="overflow-x-auto">
@@ -140,8 +124,8 @@ export default function Monitor({ mode, setMode, man, setMan }) {
       }
       footer={
         <>
-          <span>{hold ? '50 Hz, 1 s per division' : 'tick-quantised, two-phase load'}</span>
-          <span>{hold ? 'response scaled to the 146-subject means' : 'hover to read any sample'}</span>
+          <span>{hold ? '50 Hz, 1 s per division' : ''}</span>
+          <span>{hold ? 'response scaled to the 146-subject means' : ''}</span>
           <span className="ml-auto"><Fps /></span>
         </>
       }

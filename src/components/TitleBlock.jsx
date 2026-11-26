@@ -7,7 +7,6 @@ import { profile, profileLinks } from '../data'
 const EASE = [0.22, 1, 0.36, 1]
 
 export default function TitleBlock() {
-  const [mode, setMode] = useState('physio')
   const [man, setMan] = useState('supine')
   return (
     <div id="top">
@@ -87,14 +86,10 @@ export default function TitleBlock() {
         id="fig-1"
         n={1}
         caption={
-          mode === 'physio' ? (
-            <>The four postures our 146 volunteers went through: head-up 30°, supine, head-down 10° and the Valsalva manoeuvre. The simulated pulse responds in proportion to the response measured in the repository: unchanged head-up, a clear lift head-down, and the largest change on Valsalva, where P2 climbs past P1. Pick a manoeuvre (or press 1–4), hold the trace or Space for Valsalva, and click a readout for the numbers.</>
-          ) : (
-            <>A simulated intraday tick stream, quantised to tick size, like the feed FIN-X renders in under 200 ms. Move across it to read any sample off the cursor. Switch back to morph it into a pulse.</>
-          )
+          <>The four postures our 146 volunteers went through: head-up 30°, supine, head-down 10° and the Valsalva manoeuvre. The simulated pulse responds in proportion to the response measured in the repository: unchanged head-up, a clear lift head-down, and the largest change on Valsalva, where P2 climbs past P1. Pick a manoeuvre (or press 1–4), hold the trace or Space for Valsalva, and click a readout for the numbers.</>
         }
       >
-        <Monitor mode={mode} setMode={setMode} man={man} setMan={setMan} />
+        <Monitor man={man} setMan={setMan} />
       </Figure>
     </div>
   )

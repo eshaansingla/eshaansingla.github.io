@@ -64,7 +64,9 @@ export function makeCar(rnd, id, lane, z) {
 export function project(W, H, lx, z) {
   const y0 = H * HORIZON
   const t = z * z
-  return { x: W / 2 + lx * W * (0.06 + 0.62 * t), y: y0 + (H * 1.05 - y0) * t, s: 0.12 + 1.05 * t }
+  const half = W * (0.06 + 0.62 * t) // half the carriageway width in pixels at this depth
+  // everything on the road scales with the road: a car (150 units × 1.15) comes out at about 55% of a lane
+  return { x: W / 2 + lx * half, y: y0 + (H * 1.05 - y0) * t, s: half * 0.0015 }
 }
 
 function rr(ctx, x, y, w, h, r) {
@@ -136,13 +138,23 @@ export function drawScene(ctx, W, H, light) {
   ctx.lineWidth = 1.5
   ;[-1.1, 1.1].forEach((lx) => { const p0 = P(lx, 0), p1 = P(lx, 1.05); ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke() })
 
-  // central median: raised kerb with a yellow-black edge
-  const m = [P(-0.05, 0), P(0.05, 0), P(0.05, 1.05), P(-0.05, 1.05)]
-  ctx.fillStyle = rgb(mix([44, 44, 46], [150, 148, 140], light))
-  ctx.beginPath(); m.forEach((q, i) => ctx[i ? 'lineTo' : 'moveTo'](q.x, q.y)); ctx.fill()
-  ctx.strokeStyle = rgb(mix([120, 100, 30], [222, 184, 52], light))
-  ctx.lineWidth = 1.2
-  ;[-0.05, 0.05].forEach((lx) => { const p0 = P(lx, 0), p1 = P(lx, 1.05); ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke() })
+  // central divider: a raised concrete barrier with amber reflectors on top
+  const seg = 24, base = [], top = []
+  for (let k = 0; k <= seg; k++) {
+    const z = (k / seg) * 1.05
+    const l = P(-0.045, z), r = P(0.045, z), tl = P(-0.028, z), tr = P(0.028, z)
+    const hgt = 45 * l.s // about 0.8 m, against a car roof at about 1.5 m
+    base.push([l, r]); top.push([[tl.x, tl.y - hgt], [tr.x, tr.y - hgt]])
+  }
+  const face = (pts, col) => { ctx.fillStyle = col; ctx.beginPath(); pts.forEach(([x, y], i) => ctx[i ? 'lineTo' : 'moveTo'](x, y)); ctx.closePath(); ctx.fill() }
+  face([...base.map((b) => [b[0].x, b[0].y]), ...top.map((t) => t[0]).reverse()], rgb(mix([40, 40, 44], [176, 174, 166], light)))
+  face([...base.map((b) => [b[1].x, b[1].y]), ...top.map((t) => t[1]).reverse()], rgb(mix([30, 30, 34], [150, 148, 140], light)))
+  face([...top.map((t) => t[0]), ...top.map((t) => t[1]).reverse()], rgb(mix([56, 56, 60], [206, 204, 196], light)))
+  for (let k = 1; k < seg; k += 2) {
+    const [a, b] = top[k], r = Math.max(0.8, 2.6 * base[k][0].s)
+    ctx.fillStyle = `rgba(255,${Math.round(170 + 40 * light)},60,${0.55 + 0.45 * dark})`
+    ctx.beginPath(); ctx.arc((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, r, 0, 7); ctx.fill()
+  }
 
   // crash barrier on both edges
   ctx.strokeStyle = rgb(mix([60, 62, 68], [170, 172, 170], light))
@@ -414,7 +426,7 @@ export function drawCrops(ctx, crops, W, H, now) {
     const k = Math.min(1, (now - born) / 0.25)
     const e = 1 - (1 - k) ** 3
     const [bx, by, bw, bh] = det.box
-    const cw = Math.max(124, Math.min(156, bw * 2.4)), chh = cw * 0.3
+    const cw = Math.max(Math.min(124, W * 0.3), Math.min(156, bw * 2.4)), chh = cw * 0.3
     let cx = bx + bw / 2 + (dir > 0 ? 1 : -1) * (geo.width * 0.32)
     let cy = dir > 0 ? by + bh + 14 : by - geo.width * 0.62 - chh
     cx = Math.max(cw / 2 + 10, Math.min(W - cw / 2 - 10, cx))
@@ -504,7 +516,7 @@ export function drawHud(ctx, W, H, t, { fps, thr, aware, reduced }) {
   ctx.fillStyle = Math.floor(t * 1.4) % 2 ? '#ff3b30' : 'rgba(255,59,48,0.25)'
   ctx.beginPath(); ctx.arc(20, 19, 4, 0, 7); ctx.fill()
   ctx.fillStyle = 'rgba(255,255,255,0.88)'
-  ctx.fillText('REC  CAM-02  RING ROAD, BOTH CARRIAGEWAYS', 30, 23)
+  ctx.fillText(W < 560 ? 'REC  CAM-02' : 'REC  CAM-02  RING ROAD, BOTH CARRIAGEWAYS', 30, 23)
   ctx.textAlign = 'right'
   ctx.fillText(`${new Date().toLocaleTimeString('en-GB', { hour12: false })}  ${fps} fps`, W - 14, 23)
   ctx.textAlign = 'left'

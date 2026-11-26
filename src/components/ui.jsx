@@ -30,7 +30,7 @@ export function Cite({ n }) {
       aria-label={`Reference ${n}: ${r.label}`}
     >
       [{n}]
-      <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden w-60 -translate-x-1/2 translate-y-1 rounded-lg border border-ink/15 bg-canvas p-3 text-left font-mono text-[11px] leading-snug text-ink opacity-0 shadow-[0_12px_32px_-12px_rgb(0_0_0/0.35)] transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100 md:block">
+      <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden w-60 -translate-x-1/2 rounded-lg border border-ink/15 bg-canvas p-3 text-left font-mono text-[11px] leading-snug text-ink shadow-[0_12px_32px_-12px_rgb(0_0_0/0.35)] md:group-hover:block md:group-focus-visible:block">
         <span className="block text-signal">[{n}] {r.label}</span>
         <span className="mt-1 block text-ink-2">{r.text}</span>
       </span>

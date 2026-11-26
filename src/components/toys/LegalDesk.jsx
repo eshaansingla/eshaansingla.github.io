@@ -158,9 +158,13 @@ export default function LegalDesk() {
                         <>
                           {' '}
                           <sup
-                            className={`cursor-default font-mono text-[11px] ${live && hoverCite ? 'text-ink' : 'text-signal'}`}
-                            onPointerEnter={() => live && setHoverCite(true)}
-                            onPointerLeave={() => setHoverCite(false)}
+                            className={`cursor-pointer font-mono text-[11px] ${live && hoverCite ? 'text-ink' : 'text-signal'}`}
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Show the cited provision"
+                            onPointerEnter={(e) => live && e.pointerType === 'mouse' && setHoverCite(true)}
+                            onPointerLeave={(e) => e.pointerType === 'mouse' && setHoverCite(false)}
+                            onClick={() => live && setHoverCite((h) => !h)}
                           >
                             [{t.a.scored[0].cite.replace(/, \d{4}/, '')}]
                           </sup>

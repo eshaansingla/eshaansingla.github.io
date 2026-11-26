@@ -4,17 +4,17 @@ Personal site of Eshaan Singla, laid out as a working paper. Every figure is a s
 
 | Fig. | Instrument | What it shows |
 |---|---|---|
-| 1 | Bedside monitor | Eardrum/PPG pulse across head-up 30°, supine, head-down 10° and Valsalva, scaled to the 146-subject results in the Pran repo |
-| 2 | Bench test | The Pran rig on a test dummy: tilt table, laser and photodiode quadrant, breadboard parts from the report's BOM, live CSV in the firmware's format |
-| 3 | Test runner | The Pran leakage audit (real numbers from the repo) |
-| 4 | Signal analyzer | Single-pass vs forward-backward Butterworth, live lag and error |
-| 5 | FIN-X terminal | Simulated deal feed through the 3-tier LLM router with intent check |
-| 6 | Operations room | Street map with road routing, closures and the Hungarian assignment vs nearest-first (Sanchaalan Saathi) |
-| 7 | Traffic camera | Two-way traffic, front and rear plates with magnified crops, fixed vs glare-aware thresholds (plates are made up) |
-| 8 | Eval leaderboard | AETHER's real evaluation results, re-ranked by metric |
-| 9 | Legal desk | NyaayaBot's keyword gate, cited provision and 10-turn memory |
-| 10 | Profiler | Bottleneck puzzle built on the internship's 40% speed-up |
-| 11 | Rocket League | Snapshot from tracker.gg with original tier emblems |
+| 1 | Bench test | The Pran rig on a test dummy replaying two real recordings (elevated.csv, non-elevated.csv), scored window by window with the repo's final XGBoost model |
+| 2 | Test runner | The Pran leakage audit (real numbers from the repo) |
+| 3 | FIN-X terminal | Simulated deal feed through the 3-tier LLM router with intent check |
+| 4 | Operations room | Street map with road routing, closures and the Hungarian assignment vs nearest-first (Sanchaalan Saathi) |
+| 5 | Traffic camera | Two-way traffic, front and rear plates with magnified crops, fixed vs glare-aware thresholds (plates are made up) |
+| 6 | Eval leaderboard | AETHER's real evaluation results, re-ranked by metric |
+| 7 | Legal desk | NyaayaBot's keyword gate, cited provision and 10-turn memory |
+| 8 | Profiler | Bottleneck puzzle built on the internship's 40% speed-up |
+| 9 | Rocket League | Snapshot from tracker.gg with original tier emblems |
+
+Every figure works with a mouse, touch or keyboard: anything that reacts to hover also responds to a tap or click.
 
 Stack: React 19, Vite, Tailwind CSS v4, Framer Motion, self-hosted Newsreader and JetBrains Mono. Light and dark themes.
 

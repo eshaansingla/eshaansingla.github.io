@@ -22,8 +22,8 @@ const SESSIONS = {
 }
 const ORDER = [0, 1, 2, 3] // order the sessions were recorded in
 const TABS = {
-  elevated: { file: 'icp_4_83_M', who: 'subject 83 M', age: 83, start: 3, label: 'Elevated' },
-  normal: { file: 'icp_2_19_M', who: 'subject 19 M', age: 19, start: 0, label: 'Not elevated' },
+  elevated: { file: 'elevated', csv: 'elevated.csv', who: 'subject 83 M', age: 83, start: 3, label: 'Elevated' },
+  normal: { file: 'non_elevated', csv: 'non-elevated.csv', who: 'subject 19 M', age: 19, start: 0, label: 'Not elevated' },
 }
 const THR = DATA.threshold
 
@@ -39,6 +39,7 @@ const PARTS = {
   model: { name: 'Classifier', role: `The repo’s final XGBoost model scores each 10 s window. At or above ${THR.toFixed(2)} (set on validation subjects, never on test subjects) the window is called elevated.`, cost: null },
 }
 const TOTAL = 1934
+const ARM = { type: 'spring', stiffness: 90, damping: 16 }
 const COLS = ['timestamp_ms', 'ir_raw', 'red_raw', 'disp_raw', 'disp_x', 'disp_y', 'ax', 'ay', 'az', 'gx', 'gy', 'gz', 'artifact_flag', 'session_label']
 
 export default function HardwareBench() {
@@ -58,6 +59,7 @@ export default function HardwareBench() {
   const readout = useRef(null)
   const ledRef = useRef(null)
   const trace = useRef(null)
+  const rootRef = useRef(null)
   const [tilt, setTilt] = useState(0)
 
   const pickTab = (id) => { setTab(id); setSession(TABS[id].start) }
@@ -66,7 +68,7 @@ export default function HardwareBench() {
   useEffect(() => {
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
     let raf = 0, prev = performance.now(), acc = 0, i = 0, cur = null, tiltNow = 0, tiltShown = 0, visible = true
-    const el = spotRef.current?.ownerSVGElement
+    const el = rootRef.current
     const io = new IntersectionObserver(([e]) => (visible = e.isIntersecting))
     if (el) io.observe(el)
     const stats = (seg) => {
@@ -113,9 +115,11 @@ export default function HardwareBench() {
 
   const info = PARTS[hot]
   const strainKey = session === 3 && power
+  const cross = session === 3 // arms folded for the Valsalva session
   const m = SESSIONS[session]
 
   return (
+    <div ref={rootRef}>
     <Device
       name="PRAN rig, bench test"
       sub="two real recordings, replayed on a test dummy"
@@ -131,83 +135,134 @@ export default function HardwareBench() {
       footer={
         <>
           <span>{T.who}, real CSV rows; scores from the repo’s final model</span>
-          <span className="ml-auto">parts about Rs {TOTAL.toLocaleString('en-IN')} in all</span>
+          <span className="ml-auto">tap or hover a part; about Rs {TOTAL.toLocaleString('en-IN')} in all</span>
         </>
       }
     >
       <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         {/* the bench: tilt table, dummy, headphone sensor */}
         <div className="relative border-b border-rule lg:border-b-0 lg:border-r">
-          <svg viewBox="0 -50 600 450" className="block h-auto w-full" role="img" aria-label={`Test dummy on a tilt table, ${m.label}`}>
+          <svg viewBox="0 -50 600 450" className="block h-auto w-full" role="img" aria-label={`Test dummy strapped to a tilt table, ${m.label}`}>
             <defs>
-              <linearGradient id="hb-skin" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#f2c94c" /><stop offset="1" stopColor="#d9a520" /></linearGradient>
-              <linearGradient id="hb-pad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#5b8fb0" /><stop offset="1" stopColor="#3f6d8c" /></linearGradient>
-              <radialGradient id="hb-floor" cx="0.5" cy="0" r="0.8"><stop offset="0" stopColor="var(--ink)" stopOpacity="0.07" /><stop offset="1" stopColor="var(--ink)" stopOpacity="0" /></radialGradient>
+              {/* limb shading: lit from above, so each cylinder is lighter on top */}
+              <linearGradient id="hb-limb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#ffe27a" /><stop offset="0.35" stopColor="#f2c23a" /><stop offset="1" stopColor="#b98a16" /></linearGradient>
+              <radialGradient id="hb-skull" cx="0.38" cy="0.3" r="0.8"><stop offset="0" stopColor="#ffe48a" /><stop offset="0.55" stopColor="#efbd34" /><stop offset="1" stopColor="#b98a16" /></radialGradient>
+              <linearGradient id="hb-chest" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#ffe17a" /><stop offset="0.45" stopColor="#efbd34" /><stop offset="1" stopColor="#c0921c" /></linearGradient>
+              <linearGradient id="hb-pad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#6f9fbe" /><stop offset="0.5" stopColor="#4d7f9f" /><stop offset="1" stopColor="#3a6582" /></linearGradient>
+              <linearGradient id="hb-steel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#d5d8dc" /><stop offset="0.5" stopColor="#a7abb1" /><stop offset="1" stopColor="#7d8187" /></linearGradient>
+              <linearGradient id="hb-cup" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#4a4a52" /><stop offset="1" stopColor="#1c1c20" /></linearGradient>
+              <radialGradient id="hb-floor" cx="0.5" cy="0" r="0.8"><stop offset="0" stopColor="var(--ink)" stopOpacity="0.08" /><stop offset="1" stopColor="var(--ink)" stopOpacity="0" /></radialGradient>
             </defs>
             <rect x="0" y="352" width="600" height="48" fill="url(#hb-floor)" />
             <line x1="20" y1="352" x2="580" y2="352" stroke="var(--rule-2)" />
-            <path d="M300 250 L300 340 M250 350 L350 350" stroke="var(--ink)" strokeOpacity="0.55" strokeWidth="8" strokeLinecap="round" />
-            <circle cx="300" cy="250" r="9" fill="var(--paper)" stroke="var(--ink)" strokeOpacity="0.6" strokeWidth="3" />
-            <path d="M300 250 m-60 0 a60 60 0 0 1 120 0" fill="none" stroke="var(--rule-2)" strokeDasharray="2 4" />
-            <g transform={`rotate(${tilt} 300 250)`}>
-              <rect x="70" y="242" width="460" height="12" rx="3" fill="var(--ink)" fillOpacity="0.7" />
-              <rect x="74" y="226" width="452" height="16" rx="8" fill="url(#hb-pad)" />
-              <rect x="522" y="186" width="8" height="64" rx="2" fill="var(--ink)" fillOpacity="0.55" />
-              {/* dummy, lying face up, head to the left: jointed test-dummy anatomy */}
-              <g stroke="#7a5c10" strokeWidth="0.9" strokeLinejoin="round">
-                {/* far arm, half hidden behind the torso */}
-                <path d="M182 204 L250 210 L316 208" fill="none" stroke="#b98a16" strokeWidth="11" strokeLinecap="round" />
-                {/* legs: thigh, knee, shin, foot */}
-                <path d="M346 212 L420 208" fill="none" stroke="url(#hb-skin)" strokeWidth="21" strokeLinecap="round" />
-                <path d="M346 212 L420 208" fill="none" stroke="#7a5c10" strokeOpacity="0.25" strokeWidth="21" strokeLinecap="round" strokeDasharray="0 74" />
-                <path d="M420 209 L490 213" fill="none" stroke="url(#hb-skin)" strokeWidth="15" strokeLinecap="round" />
-                <path d="M486 222 C484 206 486 192 492 184 C497 178 506 180 508 188 C510 198 508 212 506 224 Z" fill="url(#hb-skin)" />
-                <path d="M486 222 L507 222" stroke="#2b2b2f" strokeWidth="4" />
-                <Bolt x={420} y={208} />
-                <Bolt x={490} y={213} r={3} />
-                <Target x={384} y={210} r={5.5} />
-                {/* torso: shoulder, chest, abdomen, pelvis; breathes out on Valsalva */}
-                <motion.g animate={{ scaleY: strainKey ? 1.12 : 1 }} transition={{ type: 'spring', stiffness: 120, damping: 14 }} style={{ transformBox: 'fill-box', transformOrigin: '50% 100%' }}>
-                  <path d="M166 226 L166 206 C168 196 178 190 194 188 C214 184 238 184 252 188 C268 193 284 197 300 197 C316 197 330 191 342 195 C350 199 352 214 350 226 Z" fill="url(#hb-skin)" />
-                  <path d="M196 196 C214 191 236 191 250 195" fill="none" strokeOpacity="0.45" />
-                  <path d="M204 202 C218 199 234 199 246 202" fill="none" strokeOpacity="0.3" />
-                  <path d="M262 199 C262 208 262 216 262 224" fill="none" strokeOpacity="0.3" />
-                  <path d="M300 197 C300 208 300 216 300 224" fill="none" strokeOpacity="0.3" />
-                </motion.g>
-                <Target x={330} y={210} r={5.5} />
-                {/* near arm: upper arm, elbow, forearm, hand resting on the thigh */}
-                <path d="M180 210 L248 216" fill="none" stroke="#e8b52a" strokeWidth="13" strokeLinecap="round" />
-                <path d="M248 216 L314 214" fill="none" stroke="#e8b52a" strokeWidth="11" strokeLinecap="round" />
-                <path d="M312 208 C322 206 332 208 336 213 C334 219 322 221 312 220 Z" fill="#e0ab22" />
-                <Bolt x={180} y={210} r={4} />
-                <Bolt x={248} y={216} r={3.5} />
-                {/* segmented neck */}
-                <rect x="144" y="199" width="26" height="20" rx="5" fill="#3a3a40" />
-                {[150, 157, 164].map((x) => <rect key={x} x={x} y="199" width="2.4" height="20" fill="#1c1c20" />)}
-                {/* head: face profile pointing up, skull resting on the pad */}
-                <path d="M112 226 C97 226 89 214 89 202 C89 190 95 182 103 179 L109 177 C112 173 114 170 117 169 C120 171 120 174 120 176 C123 177 125 178 127 179 C130 179 134 180 137 183 C141 187 143 193 147 197 L149 213 C147 222 137 226 124 226 Z" fill="url(#hb-skin)" />
-                <path d="M104 183 C108 182 111 181 113 180" fill="none" strokeOpacity="0.5" />
-                <circle cx="127" cy="186" r="1.6" fill="#7a5c10" stroke="none" />
-                <motion.ellipse cx="131" cy="187" rx="6" ry="4.5" fill="#e6a91d" stroke="none" animate={{ opacity: strainKey ? 1 : 0, scale: strainKey ? 1 : 0.4 }} />
-                {/* headphone: band over the crown, cup over the ear, IMU on the band */}
-                <path d="M92 196 C92 176 112 164 132 170" fill="none" stroke="#2b2b2f" strokeWidth="6" strokeLinecap="round" />
-                <circle cx="112" cy="207" r="17" fill="#2b2b2f" stroke="none" />
-                <circle cx="112" cy="207" r="12.5" fill="#3a3a40" stroke="none" />
-                <circle cx="112" cy="207" r="8" fill="none" stroke="#55555c" strokeWidth="1" />
-                <motion.circle cx="112" cy="207" r="3.5" fill="#ff3b30" stroke="none" animate={{ opacity: power ? [0.6, 1, 0.6] : 0.1 }} transition={{ duration: 1.4, repeat: Infinity }} />
-                <rect x="97" y="173" width="14" height="8" rx="1.5" fill="#2a5db0" stroke="none" transform="rotate(-38 104 177)" />
+            {/* base: H-frame on castors, a column and a lift actuator */}
+            <ellipse cx="300" cy="352" rx="120" ry="5" fill="var(--ink)" opacity="0.12" />
+            <rect x="200" y="330" width="200" height="10" rx="3" fill="url(#hb-steel)" />
+            {[212, 388].map((x) => (
+              <g key={x}>
+                <rect x={x - 4} y="338" width="8" height="6" fill="#6b6f75" />
+                <circle cx={x} cy="346" r="6" fill="#2b2b2f" /><circle cx={x} cy="346" r="2.2" fill="#8b8f96" />
               </g>
+            ))}
+            <rect x="290" y="250" width="20" height="82" rx="3" fill="url(#hb-steel)" />
+            <path d="M300 300 L262 262" stroke="#5d6168" strokeWidth="6" strokeLinecap="round" />
+            <path d="M300 300 L276 276" stroke="#a7abb1" strokeWidth="3.5" strokeLinecap="round" />
+            <g transform={`rotate(${tilt} 300 250)`}>
+              {/* table frame, side rail and footboard */}
+              <rect x="66" y="240" width="468" height="14" rx="3" fill="url(#hb-steel)" />
+              <rect x="66" y="244" width="468" height="2" fill="#ffffff" opacity="0.35" />
+              <circle cx="300" cy="250" r="9" fill="#d5d8dc" stroke="#6b6f75" strokeWidth="2" />
+              <circle cx="300" cy="250" r="3" fill="#6b6f75" />
+              <rect x="524" y="176" width="10" height="72" rx="2" fill="url(#hb-steel)" />
+              {/* padded mattress with stitching */}
+              <rect x="72" y="224" width="454" height="18" rx="8" fill="url(#hb-pad)" />
+              <path d="M80 229 H518" stroke="#ffffff" strokeOpacity="0.18" strokeDasharray="3 3" />
+              {[180, 300, 420].map((x) => <line key={x} x1={x} y1="225" x2={x} y2="241" stroke="#2f5670" strokeOpacity="0.5" />)}
+
+              {/* ── the dummy, supine, head to the left ── */}
+              {/* far arm, in shadow */}
+              <motion.path initial={false} animate={{ d: cross ? 'M178 208 L232 205 L232 205' : 'M178 208 L246 212 L308 210' }} transition={ARM} fill="none" stroke="#a87c12" strokeWidth="11" strokeLinecap="round" strokeLinejoin="round" />
+              {/* legs */}
+              <path d="M344 212 L422 208" fill="none" stroke="url(#hb-limb)" strokeWidth="23" strokeLinecap="round" />
+              <path d="M422 209 L488 213" fill="none" stroke="url(#hb-limb)" strokeWidth="17" strokeLinecap="round" />
+              <path d="M480 224 C478 208 480 190 487 181 C493 174 504 176 507 185 C510 196 509 212 507 224 Z" fill="url(#hb-limb)" stroke="#8a6612" strokeWidth="0.8" />
+              <rect x="478" y="219" width="31" height="6" rx="2" fill="#26262a" />
+              <path d="M352 203 C376 200 400 199 418 199" fill="none" stroke="#fff3c4" strokeOpacity="0.6" strokeWidth="1.4" strokeLinecap="round" />
+              {/* pelvis and abdomen */}
+              <path d="M262 226 L262 200 C276 197 290 197 300 196 C318 195 334 190 346 196 C352 202 354 214 352 226 Z" fill="url(#hb-chest)" stroke="#8a6612" strokeWidth="0.8" />
+              <path d="M300 197 V224 M322 194 V224" stroke="#8a6612" strokeOpacity="0.35" />
+              {/* chest: rises on Valsalva */}
+              <motion.g animate={{ scaleY: strainKey ? 1.1 : 1 }} transition={{ type: 'spring', stiffness: 110, damping: 14 }} style={{ transformBox: 'fill-box', transformOrigin: '50% 100%' }}>
+                <path d="M158 226 L158 204 C160 194 172 188 190 186 C214 182 240 183 256 188 C266 191 270 198 270 206 L270 226 Z" fill="url(#hb-chest)" stroke="#8a6612" strokeWidth="0.8" />
+                <path d="M190 192 C212 187 236 187 252 192 M196 199 C214 195 232 195 248 199 M200 206 C216 203 230 203 244 206" fill="none" stroke="#8a6612" strokeOpacity="0.3" />
+              </motion.g>
+              {/* arms: alongside the body, or folded across the chest in an X for Valsalva (as in the recording sessions) */}
+              {[
+                { d: cross ? 'M174 212 L222 211' : 'M174 212 L240 217', w: 14 },
+                { d: cross ? 'M222 211 L194 182' : 'M240 217 L304 215', w: 12 },
+              ].map((l, i) => (
+                <g key={i}>
+                  <motion.path initial={false} animate={{ d: l.d }} transition={ARM} fill="none" stroke="#8a6612" strokeWidth={l.w + 1.8} strokeLinecap="round" />
+                  <motion.path initial={false} animate={{ d: l.d }} transition={ARM} fill="none" stroke="#efbd34" strokeWidth={l.w} strokeLinecap="round" />
+                  <motion.path initial={false} animate={{ d: l.d }} transition={ARM} fill="none" stroke="#ffe48a" strokeOpacity="0.7" strokeWidth={l.w * 0.28} strokeLinecap="round" transform="translate(0 -2.5)" />
+                </g>
+              ))}
+              <motion.ellipse initial={false} animate={{ cx: cross ? 190 : 312, cy: cross ? 180 : 215 }} transition={ARM} rx="9" ry="6.5" fill="#efbd34" stroke="#8a6612" strokeWidth="0.9" />
+              {/* far forearm comes over the top to complete the cross */}
+              <motion.g initial={false} animate={{ opacity: cross ? 1 : 0 }} transition={{ duration: 0.35, delay: cross ? 0.15 : 0 }}>
+                <motion.path initial={false} animate={{ d: cross ? 'M240 205 L182 196' : 'M232 205 L231 205' }} transition={ARM} fill="none" stroke="#7a5a10" strokeWidth="12" strokeLinecap="round" />
+                <motion.path initial={false} animate={{ d: cross ? 'M240 205 L182 196' : 'M232 205 L231 205' }} transition={ARM} fill="none" stroke="#d6a624" strokeWidth="10" strokeLinecap="round" />
+                <motion.ellipse initial={false} animate={{ cx: cross ? 177 : 232, cy: cross ? 195 : 205 }} transition={ARM} rx="7.5" ry="6" fill="#d6a624" stroke="#7a5a10" strokeWidth="0.9" />
+              </motion.g>
+              <Bolt x={174} y={212} r={5} />
+              <motion.g initial={false} animate={{ x: cross ? -18 : 0, y: cross ? -6 : 0 }} transition={ARM}>
+                <Bolt x={240} y={217} r={3.8} />
+              </motion.g>
+              <Bolt x={344} y={212} r={5} />
+              <Bolt x={422} y={209} r={4.6} />
+              <Bolt x={488} y={213} r={3.4} />
+              <Target x={216} y={197} r={5} />
+              <Target x={384} y={209} r={5} />
+              {/* neck: rubber discs between aluminium plates */}
+              <rect x="134" y="200" width="28" height="20" rx="4" fill="#26262a" />
+              {[139, 146, 153].map((x) => <rect key={x} x={x} y="199" width="3" height="22" rx="1" fill="#8b8f96" />)}
+              {/* head: skull, brow, nose and chin in profile, facing up */}
+              <path d="M110 226 C94 226 86 214 86 201 C86 189 93 181 102 178 C106 177 109 177 111 176 C113 173 115 172 117 172 C119 173 119 175 119 177 C121 178 123 178 125 179 C127 178 129 178 131 179 C135 180 138 183 140 187 C142 192 144 196 146 199 L147 213 C145 222 134 226 122 226 Z" fill="url(#hb-skull)" stroke="#8a6612" strokeWidth="0.8" />
+              <path d="M103 182 C106 180 109 180 111 180" fill="none" stroke="#8a6612" strokeOpacity="0.55" />
+              <path d="M126 182 C128 183 130 183 132 182" fill="none" stroke="#8a6612" strokeOpacity="0.5" />
+              <ellipse cx="108" cy="184" rx="2.4" ry="1.4" fill="#7a5c10" />
+              <motion.ellipse cx="130" cy="187" rx="6.5" ry="4.5" fill="#e6a91d" animate={{ opacity: strainKey ? 1 : 0, scale: strainKey ? 1 : 0.4 }} />
+              {/* headphone: padded band round the crown, cup over the ear, IMU on the band */}
+              <path d="M112 186 C100 176 86 182 84 196 C83 208 88 216 96 220" fill="none" stroke="#1f1f23" strokeWidth="7" strokeLinecap="round" />
+              <path d="M110 184 C100 177 88 183 86 195" fill="none" stroke="#55555c" strokeWidth="1.6" strokeLinecap="round" />
+              <ellipse cx="110" cy="207" rx="18" ry="17" fill="#2a2a2e" />
+              <ellipse cx="110" cy="207" rx="15" ry="14" fill="url(#hb-cup)" />
+              <ellipse cx="110" cy="207" rx="9" ry="8.5" fill="none" stroke="#5d5d64" strokeWidth="1" />
+              <path d="M101 199 C105 196 112 195 117 198" fill="none" stroke="#ffffff" strokeOpacity="0.2" strokeWidth="1.4" strokeLinecap="round" />
+              <motion.circle cx="110" cy="207" r="3.2" fill="#ff3b30" animate={{ opacity: power ? [0.55, 1, 0.55] : 0.1 }} transition={{ duration: 1.4, repeat: Infinity }} />
+              <g transform="rotate(-40 95 182)">
+                <rect x="88" y="178" width="15" height="8" rx="1.5" fill="#2a5db0" />
+                <rect x="93" y="180" width="5" height="4" fill="#111" />
+              </g>
+              {/* straps over chest and thighs, with buckles */}
+              {[[262, 190], [392, 196]].map(([x, top]) => (
+                <g key={x}>
+                  <path d={`M${x - 5} 244 L${x - 5} ${top} Q${x} ${top - 4} ${x + 5} ${top} L${x + 5} 244 Z`} fill="#2b2f36" opacity="0.88" />
+                  <rect x={x - 6.5} y={top + 10} width="13" height="7" rx="1" fill="none" stroke="#b9bdc3" strokeWidth="1.6" />
+                </g>
+              ))}
             </g>
             <Cable tilt={tilt} />
             <text x="300" y="384" textAnchor="middle" className="fill-[var(--mute)] font-mono" fontSize="11">
               {m.label}{tilt ? `, IMU reads ${Math.abs(tilt).toFixed(1)}° ${tilt > 0 ? 'head-up' : 'head-down'}` : ', flat'}
             </text>
-            {strainKey && <text x="140" y="140" className="fill-[var(--signal)] font-mono" fontSize="11">straining</text>}
+            {strainKey && <text x="150" y="140" className="fill-[var(--signal)] font-mono" fontSize="11">straining</text>}
           </svg>
 
           {/* close-up of the optical head */}
           <button
-            onPointerEnter={() => setHot('head')}
+            onPointerEnter={(e) => e.pointerType === 'mouse' && setHot('head')}
+            onClick={() => setHot('head')}
             onFocus={() => setHot('head')}
             className={`relative mx-3 mb-3 flex max-w-[280px] items-stretch gap-2 rounded-xl border bg-paper/95 p-2 text-left shadow-lg backdrop-blur transition-colors sm:absolute sm:right-3 sm:top-3 sm:mx-0 sm:mb-0 sm:w-[52%] sm:max-w-[250px] ${hot === 'head' ? 'border-signal' : 'border-rule-2'}`}
           >
@@ -259,7 +314,7 @@ export default function HardwareBench() {
       {/* serial monitor */}
       <div className="border-t border-rule bg-[#111113] px-4 py-3 font-mono text-[10.5px] text-[#d8d4c8]">
         <div className="mb-1.5 flex items-center justify-between text-[#8d877c]">
-          <span>serial monitor, 115200 baud, {T.file}.csv</span>
+          <span>serial monitor, 115200 baud, {T.csv}</span>
           <span>every 5th row of the window</span>
         </div>
         <div className="overflow-x-auto">
@@ -278,6 +333,7 @@ export default function HardwareBench() {
         </div>
       </div>
     </Device>
+    </div>
   )
 }
 
@@ -291,7 +347,7 @@ function Classifier({ rec, seg, session, setSession, elevated, who, onHover }) {
     return { s, a: x(ws[0][0]), b: x(ws[ws.length - 1][0]) }
   })
   return (
-    <div className="grid gap-4 border-t border-rule px-4 py-4 md:grid-cols-[230px_minmax(0,1fr)]" onPointerEnter={onHover}>
+    <div className="grid gap-4 border-t border-rule px-4 py-4 md:grid-cols-[230px_minmax(0,1fr)]" onPointerEnter={(e) => e.pointerType === 'mouse' && onHover()} onClick={onHover}>
       <div>
         <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-mute">This window</p>
         <AnimatePresence mode="wait">
@@ -334,7 +390,7 @@ function Classifier({ rec, seg, session, setSession, elevated, who, onHover }) {
             ))}
             <line x1={x(seg.t)} x2={x(seg.t)} y1="0" y2="100" stroke="var(--signal)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
           </svg>
-          <span className="absolute right-1 hidden rounded bg-paper/80 px-1 font-mono text-[9.5px] text-mute sm:block" style={{ top: `${100 - THR * 80 - 14}%` }}>threshold</span>
+          <span className="pointer-events-none absolute right-1 hidden rounded bg-paper/80 px-1 font-mono text-[9.5px] text-mute sm:block" style={{ top: `${100 - THR * 80 - 14}%` }}>threshold</span>
         </div>
         <p className="mt-1.5 font-mono text-[10.5px] leading-snug text-mute">Orange bars cross the threshold. The replayed window is the session’s median-scoring one, not a hand-picked example.</p>
       </div>
@@ -367,9 +423,9 @@ function Target({ x, y, r = 6 }) {
 function Cable({ tilt }) {
   const a = (tilt * Math.PI) / 180
   const rot = (x, y) => [300 + (x - 300) * Math.cos(a) - (y - 250) * Math.sin(a), 250 + (x - 300) * Math.sin(a) + (y - 250) * Math.cos(a)]
-  const [x0, y0] = rot(112, 224)
-  const [x1, y1] = rot(150, 262)
-  return <path d={`M${x0} ${y0} Q${x1} ${y1 + 30} 250 330 T600 300`} fill="none" stroke="#2b2b2f" strokeWidth="3" strokeLinecap="round" />
+  const [x0, y0] = rot(110, 224)
+  const [x1, y1] = rot(110, 262)
+  return <path d={`M${x0} ${y0} C${x1 - 70} ${y1 + 20} 40 330 140 349 S 480 352 600 318`} fill="none" stroke="#2b2b2f" strokeWidth="3" strokeLinecap="round" />
 }
 
 function Part({ id, hot, setHot, children, label }) {
@@ -379,7 +435,9 @@ function Part({ id, hot, setHot, children, label }) {
       tabIndex={0}
       role="button"
       aria-label={label}
-      onPointerEnter={() => setHot(id)}
+      onPointerEnter={(e) => e.pointerType === 'mouse' && setHot(id)}
+      onClick={() => setHot(id)}
+      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setHot(id)}
       onFocus={() => setHot(id)}
       className="cursor-pointer outline-none"
       style={{ filter: on ? 'drop-shadow(0 0 4px rgba(255,106,44,0.8))' : 'none', transition: 'filter 0.2s' }}
@@ -423,8 +481,10 @@ function Breadboard({ hot, setHot, power, label, setPower, ledRef }) {
     return out
   }, [])
   const W = { red: '#d63a3a', black: '#2a2a2a', green: '#2e9b4f', yellow: '#e0b52c', orange: '#e8742a', blue: '#3d7bd9', white: '#e8e6e0', grey: '#8d9096' }
-  const sda = 'M276 186 C276 130 300 104 298 84 M298 84 C330 76 420 76 432 70'
-  const scl = 'M288 186 C288 134 312 108 310 84 M310 84 C340 82 428 84 444 70'
+  const i2c = {
+    sda: 'M173.2 176 C173.2 150 271.2 156 271.2 187 C271.2 140 294 118 294 78 C300 98 410 96 424.2 63',
+    scl: 'M183.8 176 C183.8 156 264.8 162 264.8 187 C264.8 136 287 116 287 78 C292 104 418 102 430.4 63',
+  }
   const mono = 'JetBrains Mono Variable, monospace'
   return (
     <svg viewBox="0 0 520 430" className="block h-auto w-full" role="img" aria-label="Breadboard with the ESP32, ADS1115, LM358 amplifiers, MAX30102, MPU6050, push-button and power parts">
@@ -447,24 +507,32 @@ function Breadboard({ hot, setHot, power, label, setPower, ledRef }) {
       {['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'].map((l, r) => <text key={l} x="30" y={168 + r * 15 + (r > 4 ? 12 : 0)} fontSize="5" fill="#9a958a" fontFamily={mono}>{l}</text>)}
       {[1, 5, 10, 15, 20, 25, 30].map((c) => <text key={c} x={42 + (c - 1) * 15.4} y="162" textAnchor="middle" fontSize="4.5" fill="#9a958a" fontFamily={mono}>{c}</text>)}
 
-      {/* ribbon cable from the optical head: four photodiode cores and the laser supply */}
+      {/* ribbon cable from the optical head: four photodiode cores and the laser supply, into a header by the amplifiers */}
       <g fill="none" strokeLinecap="round">
         {[0, 1, 2, 3, 4].map((k) => (
-          <path key={k} d={`M0 ${96 + k * 2.6} C70 ${96 + k * 2.6} 210 ${112 + k * 2.6} 236 ${150 + k * 2.6} S 350 ${200 - k} ${352 + k * 7} 252`} stroke={['#c9c9c9', '#c9c9c9', '#c9c9c9', '#c9c9c9', '#d63a3a'][k]} strokeWidth="2.6" />
+          <path key={k} d={`M0 ${94 + k * 2.6} C90 ${94 + k * 2.6} 200 ${104 + k * 2.6} 228 ${124 + k * 2.6} S 316 ${238 + k * 2.6} ${327 + k * 5} 296`} stroke={k === 4 ? '#d63a3a' : '#cfcfcf'} strokeWidth="2.5" />
         ))}
       </g>
-      <text x="6" y="88" fontSize="7" className="fill-[var(--mute)]" fontFamily={mono}>from the optical head</text>
+      <g filter="url(#hb-sh)"><rect x="322" y="294" width="28" height="9" rx="1" fill="#151517" /></g>
+      {[0, 1, 2, 3, 4].map((k) => <rect key={k} x={325.5 + k * 5} y="297" width="2" height="3" fill="#d4b05a" />)}
+      <text x="6" y="86" fontSize="7" className="fill-[var(--mute)]" fontFamily={mono}>from the optical head</text>
 
-      {/* jumpers */}
+      {/* power jumpers to the rails */}
       <Wire d="M120 302 C120 318 128 315 138 315" color={W.red} ends={[[138, 315]]} />
       <Wire d="M152 302 C152 324 160 333 170 333" color={W.black} ends={[[170, 333]]} />
-      {[0, 1, 2, 3].map((i) => <Wire key={i} d={`M${356 + i * 9.5} 256 C${356 + i * 9.5} 240 ${300 - i * 6} 238 ${294 - i * 6} 224`} color={W.orange} />)}
-      <Wire d={sda} color={W.green} ends={[[276, 186], [432, 70]]} />
-      <Wire d={scl} color={W.yellow} ends={[[288, 186], [444, 70]]} />
+      <Wire d="M252 187 C252 168 246 152 246 137" color={W.red} ends={[[252, 187], [246, 137]]} />
+      <Wire d="M258.4 187 C258.4 172 262 162 262 155" color={W.black} ends={[[262, 155]]} />
+      {/* op-amp outputs into A0 to A3 */}
+      {[[348, 290.4], [376.5, 296.8], [404, 303.2], [432.5, 309.6]].map(([x0, x1], i) => (
+        <Wire key={i} d={`M${x0} 250 C${x0} ${214 - i * 4} ${x1} ${206 - i * 4} ${x1} 187`} color={W.orange} ends={[[x1, 187]]} />
+      ))}
+      {/* I²C: ESP32 GPIO 21/22 to the ADS1115, then on to the MPU6050 and the MAX30102 */}
+      <Wire d={i2c.sda} color={W.green} ends={[[173.2, 176], [271.2, 187], [294, 78], [424.2, 63]]} />
+      <Wire d={i2c.scl} color={W.yellow} ends={[[183.8, 176], [264.8, 187], [287, 78], [430.4, 63]]} />
       <Wire d="M454 262 C440 246 230 246 196 220" color={W.blue} ends={[[196, 220]]} />
-      {power && [sda, scl].map((p, i) => (
+      {power && [i2c.sda, i2c.scl].map((p, i) => (
         <circle key={i} r="3" fill="#fff" stroke={i ? W.yellow : W.green} strokeWidth="1.5">
-          <animateMotion dur={`${0.9 + i * 0.25}s`} repeatCount="indefinite" path={p} />
+          <animateMotion dur={`${1.8 + i * 0.3}s`} repeatCount="indefinite" path={p} />
         </circle>
       ))}
 
@@ -495,6 +563,8 @@ function Breadboard({ hot, setHot, power, label, setPower, ledRef }) {
         <circle cx="80" cy="206" r="2.6" fill="#ff4b3a" opacity={power ? 1 : 0.2} />
         <circle ref={ledRef} cx="88" cy="206" r="2.6" fill="#4ba3ff" opacity={power ? 1 : 0.15} />
         <text x="96" y="290" fontSize="5.5" fill="#d8d4c8" fontFamily={mono}>ESP32 DEVKIT V1</text>
+        {[['D21', 173.2], ['D22', 183.8]].map(([t, x]) => <text key={t} x={x} y="185" textAnchor="middle" fontSize="3.6" fill="#d8d4c8" fontFamily={mono}>{t}</text>)}
+        {[['3V3', 120], ['GND', 152]].map(([t, x]) => <text key={t} x={x} y="291" textAnchor="middle" fontSize="3.6" fill="#d8d4c8" fontFamily={mono}>{t}</text>)}
       </Part>
 
       {/* ADS1115 breakout */}
@@ -506,6 +576,7 @@ function Breadboard({ hot, setHot, power, label, setPower, ledRef }) {
         {[[296, 202], [300, 202], [296, 210]].map(([x, y], i) => <rect key={i} x={x} y={y} width="3" height="1.8" fill="#c9a24a" />)}
         <circle cx="251" cy="222" r="2.2" fill="#f1eee7" /><circle cx="311" cy="222" r="2.2" fill="#f1eee7" />
         <text x="281" y="224" textAnchor="middle" fontSize="5.5" fill="#e9e3f5" fontFamily={mono}>ADS1115</text>
+        {['VDD', 'GND', 'SCL', 'SDA', 'ADDR', 'ALRT', 'A0', 'A1', 'A2', 'A3'].map((t, i) => <text key={t} x={252 + i * 6.4} y="194.5" textAnchor="middle" fontSize="2.6" fill="#e9e3f5" fontFamily={mono}>{t}</text>)}
       </Part>
 
       {/* LM358 TIA stage with 1% metal-film resistors */}

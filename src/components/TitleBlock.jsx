@@ -1,13 +1,10 @@
-import { useState } from 'react'
 import { motion } from 'framer-motion'
-import Monitor from './toys/Monitor'
-import { Figure, Row, Num } from './ui'
+import { Row, Num } from './ui'
 import { profile, profileLinks } from '../data'
 
 const EASE = [0.22, 1, 0.36, 1]
 
 export default function TitleBlock() {
-  const [man, setMan] = useState('supine')
   return (
     <div id="top">
       <Row className="pt-14 md:pt-20">
@@ -82,15 +79,6 @@ export default function TitleBlock() {
         </motion.div>
       </Row>
 
-      <Figure
-        id="fig-1"
-        n={1}
-        caption={
-          <>The four postures our 146 volunteers went through: head-up 30°, supine, head-down 10° and the Valsalva manoeuvre. The simulated pulse responds in proportion to the response measured in the repository: unchanged head-up, a clear lift head-down, and the largest change on Valsalva, where P2 climbs past P1. Pick a manoeuvre (or press 1–4), hold the trace for Valsalva, and click a readout for the numbers.</>
-        }
-      >
-        <Monitor man={man} setMan={setMan} />
-      </Figure>
     </div>
   )
 }

@@ -176,36 +176,6 @@ export function Device({ name, sub, status = 'live', statusLabel = 'live', right
   )
 }
 
-/** Hover/focus tooltip. */
-export function Tip({ label, children, className = '' }) {
-  const [o, setO] = useState(false)
-  return (
-    <span
-      className={`relative inline-flex ${className}`}
-      onPointerEnter={() => setO(true)}
-      onPointerLeave={() => setO(false)}
-      onFocus={() => setO(true)}
-      onBlur={() => setO(false)}
-    >
-      {children}
-      <AnimatePresence>
-        {o && label && (
-          <motion.span
-            role="tooltip"
-            initial={{ opacity: 0, y: 4, x: '-50%', scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, x: '-50%', scale: 1 }}
-            exit={{ opacity: 0, y: 4, x: '-50%' }}
-            transition={{ duration: 0.15 }}
-            className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 whitespace-nowrap rounded-md bg-ink px-2 py-1 font-mono text-[10.5px] text-canvas shadow-lg"
-          >
-            {label}
-          </motion.span>
-        )}
-      </AnimatePresence>
-    </span>
-  )
-}
-
 const panelKids = { hidden: { opacity: 0, y: 6 }, show: { opacity: 1, y: 0 } }
 
 /**

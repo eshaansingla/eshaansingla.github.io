@@ -32,19 +32,21 @@ export default function TrafficCam() {
     const ctx = cv.getContext('2d')
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
     const rnd = mulberry(42)
-    let W = 0, H = 0, raf = 0, prev = performance.now(), nextId = 12, spawnIn = 0, visible = true
+    let W = 0, H = 0, raf = 0, prev = performance.now(), nextId = 12, visible = true
+    const spawnIn = { away: 0.4, toward: 0 } // one random timer per carriageway, same range, so both sides average the same traffic
     let frames = 0, fpsT = prev, fps = 60
     const history = [] // per-frame [plates shown, false boxes shown], ~5 s
     const cars = []
     // oncoming cars enter at the horizon, outgoing cars enter from under the camera
-    const spawn = (z) => {
-      const lane = Math.floor(rnd() * LANES.length)
+    const spawn = (z, side) => {
+      const pool = LANES.map((lx, i) => i).filter((i) => (side ? (side === 'away') === (LANES[i] < 0) : true))
+      const lane = pool[Math.floor(rnd() * pool.length)]
       const away = LANES[lane] < 0
-      const z0 = z ?? (away ? 1.08 : 0)
+      const z0 = z ?? (away ? 1.06 : 0.05)
       if (cars.some((c) => c.lane === lane && Math.abs(c.z - z0) < 0.22)) return
       cars.push(makeCar(rnd, nextId++, lane, z0))
     }
-    for (let i = 0; i < 7; i++) spawn(0.15 + rnd() * 0.75)
+    for (let i = 0; i < 8; i++) spawn(0.15 + rnd() * 0.75, i % 2 ? 'away' : 'toward')
     const firstSeen = new Map() // car id -> time its plate crop appeared
 
     const resize = () => {
@@ -75,10 +77,15 @@ export default function TrafficCam() {
       if (now - fpsT > 500) { fps = Math.round((frames * 1000) / (now - fpsT)); frames = 0; fpsT = now }
 
       if (run) {
-        spawnIn -= dt
-        if (spawnIn <= 0) { spawn(); spawnIn = 0.6 + rnd() * 1.0 }
+        for (const side of ['away', 'toward']) {
+          spawnIn[side] -= dt
+          if (spawnIn[side] <= 0) { spawn(undefined, side); spawnIn[side] = 1.1 + rnd() * 1.6 }
+        }
         cars.forEach((c) => (c.z += c.dir * c.v * dt * (0.6 + c.z)))
-        for (let i = cars.length - 1; i >= 0; i--) if (cars[i].z > 1.08 || cars[i].z < 0.03) { firstSeen.delete(cars[i].id); cars.splice(i, 1) }
+        for (let i = cars.length - 1; i >= 0; i--) {
+          const c = cars[i]
+          if ((c.dir > 0 && c.z > 1.08) || (c.dir < 0 && c.z < 0.03)) { firstSeen.delete(c.id); cars.splice(i, 1) }
+        }
       }
       cars.sort((a, b) => a.z - b.z)
 
@@ -99,7 +106,7 @@ export default function TrafficCam() {
         const [px, py, pw, ph] = geo.plate
         const plateDet = { car: c.id, plate: c.plate, dir: c.dir, label: 'plate', tp: true, glare: 0.15, conf: pc, score: score(pc, 0.15), box: [px - 3, py - 3, pw + 6, ph + 6] }
         found.push(plateDet)
-        if (geo.width > 80 && py + ph < H - 24 && py > H * 0.3) crops.push({ det: plateDet, geo, dir: c.dir, id: c.id })
+        if (geo.width > W * 0.085 && py + ph < H - 24 && py > H * 0.3) crops.push({ det: plateDet, geo, dir: c.dir, id: c.id })
         if (dark > 0.2) {
           const bw = geo.width * 0.2
           geo.lights.forEach(([hx, hy], k) => {

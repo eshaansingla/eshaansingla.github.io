@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Device, Panel, Stat, Toggle, Tween } from '../kit'
 import { cssVar, onThemeChange } from '../../theme'
-import { INDIA_BOX, MH, MW, M_PER_UNIT, POIS, WORLD, areaName, screenText, drawGeo, drawMap, landColor, mulberry, randomRoadPoint, route, shortest, snap } from './opsMap'
+import { CitySim, KINDS, URG, URG_W, WORK, greedy, solve } from './opsSim'
+import { CITIES, INDIA_BOX, MH, MW, M_PER_UNIT, POIS, WORLD, areaName, cityAt, planFor, drawCities, screenText, drawGeo, drawMap, landColor, mulberry, randomRoadPoint, route, shortest, snap } from './opsMap'
 
 /*
  * Sanchaalan Saathi figure: the Sanchaalan Saathi operations room, as a live simulation on a street map.
@@ -11,11 +12,6 @@ import { INDIA_BOX, MH, MW, M_PER_UNIT, POIS, WORLD, areaName, screenText, drawG
  * Costs are road distances. A debris report closes its road until it is cleared, so routes detour.
  * Nearest-first is computed on the same snapshot so the waste figure compares like for like.
  */
-const KINDS = ['food supplies', 'medical camp', 'shelter', 'drinking water', 'debris clearing']
-const URG = ['low', 'medium', 'high']
-const URG_W = { high: 0.6, medium: 0.85, low: 1 } // urgent jobs look closer to the solver
-// seconds on site before the proof photo, by kind of job
-const WORK = { 'drinking water': 1.2, 'food supplies': 2, 'shelter': 3.2, 'medical camp': 3.8, 'debris clearing': 4.6 }
 const SPEED = 62 // map units per second
 const K_MIN = 0.0001, K_MAX = 4 // the whole world down to a single street corner
 const LEVELS = [[1.5, 'street'], [0.5, 'neighbourhood'], [0.06, 'city'], [0.0022, 'state'], [0.00045, 'country'], [0, 'world']]
@@ -24,60 +20,16 @@ const levelOf = (k) => LEVELS.find(([m]) => k >= m)[1]
 const NICE = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000, 2000000, 5000000] // metres
 const clamp01 = (x) => Math.max(0, Math.min(1, x))
 const BIG = 1e7 // cost of an unreachable pair
+const FOCUS_K = 0.06 // from here in, the feed follows the city in the middle of the view
+const inPatiala = (x, y, pad = 0) => x > -pad && x < MW + pad && y > -pad && y < MH + pad
 
-function hungarian(a) {
-  const n = a.length, m = a[0].length, INF = 1e18
-  const u = new Array(n + 1).fill(0), v = new Array(m + 1).fill(0)
-  const p = new Array(m + 1).fill(0), way = new Array(m + 1).fill(0)
-  for (let i = 1; i <= n; i++) {
-    p[0] = i
-    let j0 = 0
-    const minv = new Array(m + 1).fill(INF), used = new Array(m + 1).fill(false)
-    do {
-      used[j0] = true
-      const i0 = p[j0]
-      let delta = INF, j1 = 0
-      for (let j = 1; j <= m; j++) {
-        if (used[j]) continue
-        const cur = a[i0 - 1][j - 1] - u[i0] - v[j]
-        if (cur < minv[j]) { minv[j] = cur; way[j] = j0 }
-        if (minv[j] < delta) { delta = minv[j]; j1 = j }
-      }
-      for (let j = 0; j <= m; j++) {
-        if (used[j]) { u[p[j]] += delta; v[j] -= delta } else minv[j] -= delta
-      }
-      j0 = j1
-    } while (p[j0] !== 0)
-    do { const j1 = way[j0]; p[j0] = p[j1]; j0 = j1 } while (j0)
-  }
-  const out = []
-  for (let j = 1; j <= m; j++) if (p[j]) out.push([p[j] - 1, j - 1])
-  return out
-}
-/** Min-cost matching on a volunteers × tasks cost matrix (rectangular either way). */
-function solve(C) {
-  if (!C.length || !C[0].length) return []
-  if (C.length <= C[0].length) return hungarian(C)
-  const T = C[0].map((_, j) => C.map((row) => row[j]))
-  return hungarian(T).map(([r, c]) => [c, r])
-}
-/** Nearest-first: repeatedly take the globally closest free pair. */
-function greedy(C) {
-  const uv = new Set(), ut = new Set(), pairs = []
-  for (let k = 0; k < Math.min(C.length, C[0]?.length || 0); k++) {
-    let m = Infinity, bi = -1, bj = -1
-    C.forEach((row, i) => !uv.has(i) && row.forEach((c, j) => { if (!ut.has(j) && c < m) { m = c; bi = i; bj = j } }))
-    if (bi < 0) break
-    uv.add(bi); ut.add(bj); pairs.push([bi, bj])
-  }
-  return pairs
-}
 const hex = (a) => Math.round(Math.max(0, Math.min(1, a)) * 255).toString(16).padStart(2, '0')
 const km = (u) => `${((u * M_PER_UNIT) / 1000).toFixed(2)} km`
 
 export default function OpsRoom() {
   const [feed, setFeed] = useState([])
-  const [stats, setStats] = useState({ open: 0, resolved: 0, avg: 0, waste: 0, closed: 0, flagged: 0 })
+  const [stats, setStats] = useState({ open: 0, resolved: 0, avg: 0, waste: 0, closed: 0, flagged: 0, active: 0 })
+  const [focus, setFocus] = useState('Patiala')
   const [showGreedy, setShowGreedy] = useState(false)
   const [paused, setPaused] = useState(false)
   const [sel, setSel] = useState(null)
@@ -111,10 +63,53 @@ export default function OpsRoom() {
     let sp = shortest(closed)
     let resolved = 0, respSum = 0, optSum = 0, greedySum = 0, greedyRoutes = [], flagged = 0
 
-    const pushFeed = (t) => setFeed((f) => [{ id: t.id, kind: t.kind, urg: t.urg, people: t.people, where: t.where, status: 'extracting', vol: null }, ...f].slice(0, 6))
-    const patchFeed = (id, patch) => setFeed((f) => f.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+    // every city runs its own operation; reports from all of them land in one store, newest first
+    const sims = CITIES.map((c) => { const L = planFor(c); return new CitySim(c, L, mulberry(L.seed ^ 0x5bd1e995)) })
+    const byCity = new Map(), recent = [], recs = new Map()
+    let dirty = true, focusName = 'Patiala', lastFlush = 0
+    const record = (city, id, base) => {
+      const key = `${city}#${id}`
+      const r = { key, city, id, status: 'extracting', vol: null, ...base }
+      recs.set(key, r)
+      recent.unshift(r); if (recent.length > 6) recent.length = 6
+      const list = byCity.get(city) || []
+      list.unshift(r); if (list.length > 6) recs.delete(list.pop().key)
+      byCity.set(city, list)
+      dirty = true
+    }
+    const patch = (city, id, p) => { const r = recs.get(`${city}#${id}`); if (r) { Object.assign(r, p); dirty = true } }
+    const emit = (sim, t, p) => {
+      if (!recs.has(`${sim.c.n}#${t.id}`)) record(sim.c.n, t.id, { kind: t.kind, urg: t.urg, people: t.people, where: p.where })
+      patch(sim.c.n, t.id, p)
+    }
+    const pushFeed = (t) => record('Patiala', t.id, { kind: t.kind, urg: t.urg, people: t.people, where: t.where })
+    const patchFeed = (id, p) => patch('Patiala', id, p)
     const live = (t) => t.state !== 'resolved' && t.state !== 'rejected'
-    const sync = () => setStats({ open: tasks.filter(live).length, resolved, avg: resolved ? respSum / resolved : 0, waste: optSum ? ((greedySum - optSum) / optSum) * 100 : 0, closed: closed.size, flagged })
+    const sync = () => { dirty = true }
+    // the city under the middle of the view, or null for worldwide
+    const focusAt = () => {
+      const v = view.current
+      if (v.k < FOCUS_K) return null
+      const cx = (MW / 2 - v.tx) / v.k, cy = (MH / 2 - v.ty) / v.k
+      if (inPatiala(cx, cy, 300)) return 'Patiala'
+      let best = null, bd = Infinity
+      sims.forEach((s) => { const d = Math.hypot(s.c.x - cx, s.c.y - cy); if (d < s.c.R * 1.6 && d < bd) { bd = d; best = s.c.n } })
+      return best
+    }
+    const simOf = (name) => sims.find((s) => s.c.n === name)
+    const simAt = (x, y) => sims.find((s) => Math.hypot(s.c.x - x, s.c.y - y) < s.c.R * 1.15)
+    const flush = (now) => {
+      const f = focusAt()
+      if (f !== focusName) { focusName = f; dirty = true; setFocus(f) }
+      if (!dirty || now - lastFlush < (f ? 250 : 700)) return
+      dirty = false; lastFlush = now
+      setFeed((f ? byCity.get(f) || [] : recent).map((r) => ({ ...r })))
+      let open = tasks.filter(live).length, res = resolved, rs = respSum, fl = flagged, os = optSum, gs = greedySum, active = open ? 1 : 0
+      sims.forEach((s) => { const n = s.open(); open += n; if (n) active++; res += s.stats.resolved; rs += s.stats.respSum; fl += s.stats.flagged; os += s.stats.opt; gs += s.stats.greedy })
+      setStats({ open, resolved: res, avg: res ? rs / res : 0, waste: os ? ((gs - os) / os) * 100 : 0, closed: closed.size, flagged: fl, active })
+    }
+    // start with the world already busy
+    for (let i = 0; i < 70; i++) sims.forEach((s) => s.step(0.2, emit))
 
     const setClosures = () => {
       closed.clear()
@@ -201,15 +196,40 @@ export default function OpsRoom() {
     }
 
     api.current = {
-      report: (x, y) => addTask(snap(x, y), true),
+      report: (x, y) => {
+        if (inPatiala(x, y)) { addTask(snap(x, y), true); return }
+        const s = simAt(x, y)
+        if (!s) return
+        const l = s.toLocal(x, y), p = s.snap(l.x, l.y)
+        if (p) s.add(emit, p, true)
+      },
       addVol: () => {
+        const f = focusAt()
+        if (f && f !== 'Patiala') { simOf(f)?.addVol(); return }
         if (vols.length >= 8) return
         const s = snap(hub.x, hub.y + 30)
         vols.push({ id: vols.length + 1, x: s.x, y: s.y, pos: s, task: null, path: [], trail: [] })
         reassign()
       },
       hit: (x, y) => {
-        if (view.current.k < CLUSTER_K) return Math.hypot(x - MW / 2, y - MH / 2) < 40 / view.current.k ? { kind: 'cluster' } : null
+        const kk = view.current.k
+        if (kk < CLUSTER_K) {
+          // whichever marker is nearest wins: the operation on Patiala, or another city to fly to
+          const dOps = Math.hypot(x - MW / 2, y - MH / 2), hitOps = dOps < (kk < 0.006 ? 14 : 22) / kk
+          const near = cityAt(x, y, kk)
+          if (near && (!hitOps || near.d < dOps)) return { kind: 'city', c: near.c }
+          return hitOps ? { kind: 'cluster' } : null
+        }
+        if (!inPatiala(x, y, 60)) {
+          // a pin or a volunteer in another city's operation
+          const s = simAt(x, y)
+          if (!s) return null
+          const l = s.toLocal(x, y), r = 14 / Math.sqrt(kk)
+          const v = s.vols.find((q) => Math.hypot(q.x - l.x, q.y - l.y) < r)
+          if (v) return { kind: 'sv', s, v }
+          const t = s.tasks.find((q) => s.live(q) && q.state !== 'incoming' && Math.hypot(q.x - l.x, q.y - 12 / kk - l.y) < r + 4)
+          return t ? { kind: 'st', s, t } : null
+        }
         const r = 14 / Math.sqrt(view.current.k)
         const v = vols.find((q) => Math.hypot(q.x - x, q.y - y) < r)
         if (v) return { kind: 'v', v }
@@ -223,6 +243,7 @@ export default function OpsRoom() {
       flyTo,
       home: () => flyTo(1, MW / 2, MH / 2),
       detailed: () => view.current.k >= 0.25,
+      focus: () => focusAt(),
       linked: (t) => tasks.filter((o) => o !== t && o.state !== 'resolved' && t.kind === 'debris clearing' && o.vol && o.vol.path.length && Math.hypot(o.x - t.x, o.y - t.y) < 260).map((o) => o.id),
     }
 
@@ -294,6 +315,7 @@ export default function OpsRoom() {
         }
       })
       for (let i = tasks.length - 1; i >= 0; i--) if ((tasks[i].state === 'resolved' || tasks[i].state === 'rejected') && simT - tasks[i].t0 > 1.4) tasks.splice(i, 1)
+      sims.forEach((s) => s.step(dt, emit))
     }
 
     const polyline = (pts) => { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke() }
@@ -316,7 +338,29 @@ export default function OpsRoom() {
         ctx.fillRect(0, 0, W, H)
         ctx.setTransform(dpr * sx * k, 0, 0, dpr * sy * k, dpr * sx * v.tx, dpr * sy * v.ty)
         drawMap(ctx, dark, closed, k, reduced ? 0 : t)
+        drawCities(ctx, dark, k, reduced ? 0 : t, { x0: -v.tx / k, y0: -v.ty / k, x1: (MW - v.tx) / k, y1: (MH - v.ty) / k })
         ctx.globalAlpha = 1
+      }
+      const vw = { x0: -v.tx / k, y0: -v.ty / k, x1: (MW - v.tx) / k, y1: (MH - v.ty) / k }
+      const seen = (s, pad) => s.c.x + pad > vw.x0 && s.c.x - pad < vw.x1 && s.c.y + pad > vw.y0 && s.c.y - pad < vw.y1
+      if (k < CLUSTER_K) {
+        // far out: every other city's operation shows as a live marker, a ring going out for each new report
+        const count = k >= 0.006
+        sims.forEach((s) => {
+          if (!seen(s, 40 / k)) return
+          const n = s.open()
+          if (!reduced) s.tasks.forEach((tk) => {
+            if (tk.state !== 'incoming') return
+            const q = Math.min(1, (s.t - tk.t0) / 1.4)
+            ctx.strokeStyle = C.signal + hex(0.75 * (1 - q)); ctx.lineWidth = 1.2 / k
+            ctx.beginPath(); ctx.arc(s.c.x, s.c.y, (3 + q * (count ? 16 : 11)) / k, 0, 7); ctx.stroke()
+          })
+          if (!n) return
+          const r = (count ? 7.5 : 2.4) / k
+          ctx.fillStyle = C.signal
+          ctx.beginPath(); ctx.arc(s.c.x, s.c.y, r, 0, 7); ctx.fill()
+          if (count) screenText(ctx, String(n), s.c.x, s.c.y, 9, { weight: 700, color: '#fff', dy: 3.2 })
+        })
       }
       if (k < CLUSTER_K) {
         // far out: the whole operation collapses into one marker on Patiala
@@ -423,6 +467,14 @@ export default function OpsRoom() {
         ctx.fillText(`V${vo.id}`, vo.x, vo.y + 3.3 * u)
       })
       ctx.textAlign = 'left'
+      // every other city on screen, in its own rotated street grid
+      sims.forEach((s) => {
+        if (!seen(s, s.c.R * 1.2)) return
+        ctx.save(); ctx.translate(s.c.x, s.c.y); ctx.rotate(s.L.rot)
+        s.draw(ctx, k, reduced ? 0 : t, C, hex, flags.current.showGreedy)
+        ctx.restore()
+      })
+      ctx.textAlign = 'left'
 
       drawOverlay(k, sx)
     }
@@ -469,6 +521,7 @@ export default function OpsRoom() {
       if (!visible) return
       if (!flags.current.paused && !reduced) step(dt)
       draw(now / 1000)
+      flush(now)
     }
     raf = requestAnimationFrame(frame)
     return () => { cancelAnimationFrame(raf); ro.disconnect(); io.disconnect(); offTheme() }
@@ -540,8 +593,20 @@ export default function OpsRoom() {
       return
     }
     if (g.moved) return
+    if (g.h?.kind === 'st' || g.h?.kind === 'sv') {
+      const { s } = g.h
+      if (g.h.kind === 'st') {
+        const t = g.h.t, w = s.toWorld(t.x, t.y)
+        setSel({ t: { id: t.id, kind: t.kind, urg: t.urg, people: t.people, where: s.area(t.x, t.y), vol: t.vol?.id, city: s.c.n }, ...panelAt(w.x, w.y) })
+      } else {
+        const v = g.h.v, w = s.toWorld(v.x, v.y)
+        setSel({ v: { id: v.id, city: s.c.n, task: v.task ? { id: v.task.id, kind: v.task.kind } : null, left: v.task && v.task.state === 'open' ? s.len(v, v.path) : 0 }, ...panelAt(w.x, w.y) })
+      }
+      return
+    }
     if (g.h?.kind === 't') { setSel({ t: { ...g.h.t, vol: g.h.t.vol?.id, linked: api.current.linked(g.h.t) }, ...panelAt(g.h.t.x, g.h.t.y) }); return }
     if (g.h?.kind === 'cluster') { api.current.home(); return }
+    if (g.h?.kind === 'city') { api.current.flyTo(0.7, g.h.c.x, g.h.c.y, 900); return }
     // double tap or double click zooms in; a single tap on the street map files a report
     if (tapTimer.current) {
       clearTimeout(tapTimer.current); tapTimer.current = null
@@ -551,7 +616,7 @@ export default function OpsRoom() {
     const at = g.start
     tapTimer.current = setTimeout(() => {
       tapTimer.current = null
-      if (api.current.detailed() && at.x > 0 && at.x < MW && at.y > 0 && at.y < MH) api.current.report?.(at.x, at.y)
+      if (api.current.detailed()) api.current.report?.(at.x, at.y)
       setSel(null)
     }, 260)
   }
@@ -589,6 +654,7 @@ export default function OpsRoom() {
             <Toggle on={showGreedy} onChange={setShowGreedy} label="Show nearest-first routes" /> nearest-first
           </label>
           <div className="ml-auto flex flex-wrap items-baseline gap-x-5 gap-y-1">
+            <Stat label="cities active"><Tween value={stats.active} /></Stat>
             <Stat label="open">{stats.open}</Stat>
             <Stat label="roads closed" accent={stats.closed > 0}>{stats.closed}</Stat>
             <Stat label="fake alerts caught"><Tween value={stats.flagged} /></Stat>
@@ -601,7 +667,7 @@ export default function OpsRoom() {
       footer={
         <>
           <span>tap a street to file a report</span>
-          <span>drag to pan; pinch, double-tap or Ctrl + scroll to zoom, street to all of India</span>
+          <span>drag to pan; pinch, double-tap or Ctrl + scroll to zoom; tap a city to fly there</span>
           <span className="ml-auto">routes re-solved on every change</span>
         </>
       }
@@ -638,7 +704,7 @@ export default function OpsRoom() {
             onClose={closeSel}
             left={sel?.left ?? 50}
             top={sel?.top ?? 20}
-            title={sel?.t ? `incident ${sel.t.id}, ${sel.t.kind}` : sel?.v ? `volunteer V${sel.v.id}` : ''}
+            title={sel?.t ? `incident ${sel.t.id}, ${sel.t.kind}` : sel?.v ? `volunteer V${sel.v.id}${sel.v.city ? `, ${sel.v.city}` : ''}` : ''}
             rows={
               sel?.t
                 ? [
@@ -646,7 +712,7 @@ export default function OpsRoom() {
                     ['people', String(sel.t.people)],
                     ['area', sel.t.where],
                     ['assigned', sel.t.vol ? `V${sel.t.vol}` : 'waiting'],
-                    ...(sel.t.kind === 'debris clearing' ? [['road', 'closed until cleared'], ['linked incidents', sel.t.linked.length ? sel.t.linked.join(', ') : 'none nearby']] : []),
+                    ...(sel.t.kind === 'debris clearing' && !sel.t.city ? [['road', 'closed until cleared'], ['linked incidents', sel.t.linked.length ? sel.t.linked.join(', ') : 'none nearby']] : []),
                   ]
                 : sel?.v
                   ? [['heading to', sel.v.task ? `incident ${sel.v.task.id}, ${sel.v.task.kind}` : 'standing by'], ['road distance left', km(sel.v.left)]]
@@ -658,12 +724,15 @@ export default function OpsRoom() {
         {/* field reports */}
         <div className="relative border-t border-rule md:border-l md:border-t-0">
           <div className="md:absolute md:inset-0 md:flex md:flex-col">
-          <p className="border-b border-rule px-4 py-2.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-mute">Field reports</p>
+          <p className="flex items-baseline justify-between gap-2 border-b border-rule px-4 py-2.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-mute">
+            <span>Field reports</span>
+            <span className="truncate normal-case tracking-normal text-ink-2">{focus ?? `worldwide, ${CITIES.length + 1} cities`}</span>
+          </p>
           <ul className="max-h-[420px] overflow-hidden md:max-h-none md:flex-1 md:[mask-image:linear-gradient(to_bottom,#000_85%,transparent)]">
             <AnimatePresence initial={false}>
               {feed.map((r) => (
                 <motion.li
-                  key={r.id}
+                  key={r.key}
                   layout
                   initial={{ opacity: 0, x: 24 }}
                   animate={{ opacity: r.status === 'resolved' || r.status === 'flagged' || r.status === 'falsealarm' ? 0.55 : 1, x: 0 }}
@@ -676,7 +745,7 @@ export default function OpsRoom() {
                     <span className={`font-mono text-[10px] uppercase tracking-wider ${r.escalated && r.status !== 'resolved' ? 'text-[#e5484d]' : r.urg === 'high' ? 'text-signal' : 'text-mute'}`}>{r.escalated && r.status !== 'resolved' ? 'escalated' : r.urg}</span>
                   </div>
                   <dl className="mt-1.5 grid grid-cols-[52px_1fr] gap-y-0.5 font-mono text-[11px]">
-                    {[['need', r.kind], ['people', r.people], ['where', r.where]].map(([k, v], i) => (
+                    {[['need', r.kind], ['people', r.people], ['where', !focus && r.city === 'Patiala' ? `${r.where}, Patiala` : r.where]].map(([k, v], i) => (
                       <motion.div key={k} className="contents" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 + i * 0.35 }}>
                         <dt className="text-mute">{k}</dt>
                         <dd>{v}</dd>
@@ -685,7 +754,7 @@ export default function OpsRoom() {
                   </dl>
                   <AnimatePresence mode="wait">
                     <motion.p key={r.status} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={`mt-1.5 font-mono text-[11px] ${r.status === 'resolved' ? 'text-ink' : r.status === 'flagged' || r.status === 'falsealarm' ? 'text-[#e5484d]' : ['verifying', 'assigned', 'working', 'searching'].includes(r.status) ? 'text-signal' : 'text-mute'}`}>
-                      {r.status === 'resolved' ? '✓ ' : r.status === 'flagged' || r.status === 'falsealarm' ? '× ' : ''}{STATUS[r.status]}{r.status === 'flagged' && r.why ? `: ${r.why}, not dispatched` : ''}{r.vol && r.status === 'assigned' ? `, V${r.vol} en route` : ''}{r.kind === 'debris clearing' && !['resolved', 'extracting', 'flagged', 'falsealarm'].includes(r.status) ? ', road closed' : ''}
+                      {r.status === 'resolved' ? '✓ ' : r.status === 'flagged' || r.status === 'falsealarm' ? '× ' : ''}{STATUS[r.status]}{r.status === 'flagged' && r.why ? `: ${r.why}, not dispatched` : ''}{r.vol && r.status === 'assigned' ? `, V${r.vol} en route` : ''}{r.kind === 'debris clearing' && r.city === 'Patiala' && !['resolved', 'extracting', 'flagged', 'falsealarm'].includes(r.status) ? ', road closed' : ''}
                     </motion.p>
                   </AnimatePresence>
                 </motion.li>

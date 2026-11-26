@@ -26,6 +26,7 @@ export default function TrafficCam() {
   const live = useRef({ light, thr, aware: false, paused })
   live.current = { light, thr, aware: mode === 'aware', paused }
   const dets = useRef([])
+  const offX = useRef(0) // horizontal offset of the framed scene on narrow screens
 
   useEffect(() => {
     const cv = canvas.current
@@ -89,14 +90,18 @@ export default function TrafficCam() {
       }
       cars.sort((a, b) => a.z - b.z)
 
-      const signBox = drawScene(ctx, W, H, L.light)
+      // narrow screens frame the middle of the road at full size rather than shrinking everything
+      const VW = Math.max(W, 640), OX = (W - VW) / 2
+      ctx.save()
+      ctx.translate(OX, 0)
+      const signBox = drawScene(ctx, VW, H, L.light)
 
       const conf = (day, night) => day * L.light + night * dark
       const score = (c, glare) => (L.aware ? c - PENALTY * glare * dark : c)
       const found = [], crops = []
       cars.forEach((c) => {
         if (c.z < 0.04) return
-        const p = project(W, H, LANES[c.lane], c.z)
+        const p = project(VW, H, LANES[c.lane], c.z)
         const geo = drawCar(ctx, c, p, L.light)
         const rear = c.dir < 0
         drawGlare(ctx, geo, p.s, dark, rear)
@@ -106,7 +111,8 @@ export default function TrafficCam() {
         const [px, py, pw, ph] = geo.plate
         const plateDet = { car: c.id, plate: c.plate, dir: c.dir, label: 'plate', tp: true, glare: 0.15, conf: pc, score: score(pc, 0.15), box: [px - 3, py - 3, pw + 6, ph + 6] }
         found.push(plateDet)
-        if (geo.width > W * 0.085 && py + ph < H - 24 && py > H * 0.3) crops.push({ det: plateDet, geo, dir: c.dir, id: c.id })
+        // crop only when the plate is readable on the car too, so the two can be compared
+        if (ph >= 7 && py + ph < H - 24 && py > H * 0.3 && px + OX > 4 && px + pw + OX < W - 4) crops.push({ det: plateDet, geo, dir: c.dir, id: c.id })
         if (dark > 0.2) {
           const bw = geo.width * 0.2
           geo.lights.forEach(([hx, hy], k) => {
@@ -125,8 +131,10 @@ export default function TrafficCam() {
       const shown = crops.filter((q) => q.det.kept)
       shown.forEach((q) => { if (!firstSeen.has(q.id)) firstSeen.set(q.id, t) })
       cars.forEach((c) => { if (!shown.some((q) => q.id === c.id)) firstSeen.delete(c.id) })
-      drawCrops(ctx, shown.map((q) => ({ ...q, born: firstSeen.get(q.id) })), W, H, t)
+      drawCrops(ctx, shown.map((q) => ({ ...q, born: firstSeen.get(q.id) })), -OX, -OX + W, H, t)
+      ctx.restore()
       dets.current = found
+      offX.current = OX
       drawHud(ctx, W, H, t, { fps, thr: L.thr, aware: L.aware, reduced })
 
       history.push([found.filter((d) => d.tp && d.kept).length, found.filter((d) => !d.tp && d.kept).length])
@@ -144,9 +152,9 @@ export default function TrafficCam() {
 
   const pick = (e) => {
     const r = canvas.current.getBoundingClientRect()
-    const x = e.clientX - r.left, y = e.clientY - r.top
+    const x = e.clientX - r.left - offX.current, y = e.clientY - r.top
     const hit = [...dets.current].reverse().find((d) => x >= d.box[0] && x <= d.box[0] + d.box[2] && y >= d.box[1] - 15 && y <= d.box[1] + d.box[3])
-    setSel(hit ? { ...hit, left: (x / r.width) * 100, top: Math.min(50, (y / r.height) * 100 + 6) } : null)
+    setSel(hit ? { ...hit, left: ((x + offX.current) / r.width) * 100, top: Math.min(50, (y / r.height) * 100 + 6) } : null)
   }
   const setFrom = (e) => {
     const r = ruler.current.getBoundingClientRect()

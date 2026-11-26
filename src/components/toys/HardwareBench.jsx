@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Device, Seg } from '../kit'
 import DATA from '../../assets/pran_recordings.json'
@@ -287,28 +287,24 @@ export default function HardwareBench() {
         {/* the electronics, breadboard-simulator style */}
         <div className="relative">
           <Breadboard hot={hot} setHot={setHot} power={power} label={session} setPower={setPower} ledRef={ledRef} />
-          <AnimatePresence initial={false}>
-            {info ? (
-              <motion.div
-                key={hot}
-                role="status"
-                initial={{ opacity: 0, y: -6, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, transition: { duration: 0.08 } }}
-                transition={{ duration: 0.16 }}
-                className="absolute left-2 top-2 w-[min(250px,62%)] rounded-xl border border-signal/50 bg-paper/95 p-3 shadow-lg backdrop-blur"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <p className="font-mono text-[11.5px] leading-tight text-ink">{info.name}</p>
-                  <button onClick={() => setHot(null)} aria-label="Close part details" className="-mr-1 -mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-full text-mute hover:bg-ink/10 hover:text-ink">✕</button>
-                </div>
-                <p className="mt-1 font-mono text-[18px] leading-none text-signal">{info.cost ? `Rs ${info.cost}` : 'not priced in the BOM'}</p>
-                <p className="mt-1.5 text-[13px] leading-snug text-ink-2">{info.role}</p>
-              </motion.div>
-            ) : (
-              <motion.p key="hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.05 } }} className="pointer-events-none absolute left-3 top-2.5 rounded-full bg-paper/90 px-2.5 py-1 font-mono text-[10.5px] text-mute">
-                tap any part for its price
-              </motion.p>
-            )}
-          </AnimatePresence>
+          {/* part details sit under the board, so they never cover a part */}
+          <div className="relative min-h-[104px] border-t border-rule px-4 py-3" aria-live="polite">
+            <AnimatePresence initial={false} mode="popLayout">
+              {info ? (
+                <motion.div key={hot} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.06 } }} transition={{ duration: 0.16 }}>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="font-mono text-[12px] text-ink">{info.name}</p>
+                    <p className="shrink-0 font-mono text-[17px] leading-none text-signal">{info.cost ? `Rs ${info.cost}` : 'not priced in the BOM'}</p>
+                  </div>
+                  <p className="mt-1.5 text-[14px] leading-snug text-ink-2">{info.role}</p>
+                </motion.div>
+              ) : (
+                <motion.p key="hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.05 } }} className="font-mono text-[11.5px] text-mute">
+                  Tap or hover any part on the board, or the cup close-up, for its price and what it does.
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
 
@@ -326,7 +322,7 @@ export default function HardwareBench() {
           <span>serial monitor, 115200 baud, {T.csv}</span>
           <span>every 5th row of the window</span>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Serial monitor rows">
           <table className="w-full min-w-[640px] border-collapse text-right tabular-nums">
             <thead className="text-[#8d877c]"><tr>{COLS.map((h) => <th key={h} className="px-1 font-normal">{h}</th>)}</tr></thead>
             <tbody>
@@ -477,8 +473,13 @@ function Cable({ tilt }) {
 
 function Part({ id, hot, setHot, children, label }) {
   const on = hot === id
+  // a transparent box over the whole part, so a tap between its pins still lands on it
+  const ref = useRef(null)
+  const [box, setBox] = useState(null)
+  useLayoutEffect(() => { try { setBox(ref.current.getBBox()) } catch { /* not rendered */ } }, [])
   return (
     <g
+      ref={ref}
       tabIndex={0}
       role="button"
       aria-label={label}
@@ -489,6 +490,7 @@ function Part({ id, hot, setHot, children, label }) {
       className="cursor-pointer outline-none"
       style={{ filter: on ? 'drop-shadow(0 0 4px rgba(255,106,44,0.8))' : 'none', transition: 'filter 0.2s' }}
     >
+      {box && <rect x={box.x - 1} y={box.y - 1} width={box.width + 2} height={box.height + 2} fill="transparent" />}
       {children}
     </g>
   )
@@ -534,7 +536,7 @@ function Breadboard({ hot, setHot, power, label, setPower, ledRef }) {
   }
   const mono = 'JetBrains Mono Variable, monospace'
   return (
-    <svg viewBox="0 0 520 430" className="block h-auto w-full" role="img" aria-label="Breadboard with the ESP32, ADS1115, LM358 amplifiers, MAX30102, MPU6050, push-button and power parts">
+    <svg viewBox="0 0 520 430" className="block h-auto w-full" role="group" aria-label="Breadboard with the ESP32, ADS1115, LM358 amplifiers, MAX30102, MPU6050, push-button and power parts">
       <defs>
         <filter id="hb-sh" x="-10%" y="-10%" width="130%" height="140%"><feDropShadow dx="0" dy="2" stdDeviation="1.8" floodOpacity="0.35" /></filter>
         <linearGradient id="hb-can" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#e3e5e8" /><stop offset="0.5" stopColor="#c3c6ca" /><stop offset="1" stopColor="#a9acb1" /></linearGradient>

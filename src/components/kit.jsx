@@ -220,9 +220,9 @@ export function Panel({ open, onClose, left = 50, top = 50, title, rows = [], ch
                 <dd className="text-right">{v}</dd>
               </motion.div>
             ))}
-            {children && <motion.div variants={panelKids} className="pt-1.5 text-[14px] leading-snug text-ink-2">{children}</motion.div>}
-            {action && <motion.div variants={panelKids} className="pt-2">{action}</motion.div>}
           </motion.dl>
+          {children && <motion.div initial="hidden" animate="show" variants={panelKids} className="pt-1.5 text-[14px] leading-snug text-ink-2">{children}</motion.div>}
+          {action && <motion.div initial="hidden" animate="show" variants={panelKids} className="pt-2">{action}</motion.div>}
         </motion.div>
       )}
     </AnimatePresence>

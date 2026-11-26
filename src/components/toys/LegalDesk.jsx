@@ -242,7 +242,7 @@ export default function LegalDesk() {
                 )}
               </Step>
               <Step n={3} on={cur.stage >= 3} title="What has been said so far?">
-                <div className="flex gap-1" aria-label={`${Math.min(memoryUsed, MEMORY)} of ${MEMORY} memory slots used`}>
+                <div className="flex gap-1" role="img" aria-label={`${Math.min(memoryUsed, MEMORY)} of ${MEMORY} memory slots used`}>
                   {Array.from({ length: MEMORY }, (_, i) => (
                     <motion.span key={i} className="h-3 flex-1 rounded-sm" animate={{ backgroundColor: i < memoryUsed ? 'var(--signal)' : 'color-mix(in srgb, var(--ink) 10%, transparent)' }} />
                   ))}

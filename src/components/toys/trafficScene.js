@@ -243,7 +243,7 @@ export function drawCar(ctx, car, p, light) {
   }
 }
 
-const PLATE = { w: 50, h: 13 }
+const PLATE = { w: 56, h: 15 }
 
 function drawBody(ctx, L, front) {
   const { w, body, belt, roof, ride, top, ct, paint, hi, lo, light } = L
@@ -339,7 +339,7 @@ function drawFront(ctx, L) {
   ctx.fillStyle = 'rgba(214,218,222,0.85)'
   ctx.beginPath(); ctx.ellipse(0, ly + 2, 4, 2.6, 0, 0, 7); ctx.fill()
   // lower intake and fog lamps
-  const py = -ride - body * 0.36
+  const py = -ride - body * 0.42
   ctx.fillStyle = '#0d0d0f'
   rr(ctx, -w / 2 + 22, py + PLATE.h + 2, w - 44, 6, 3); ctx.fill()
   ctx.fillStyle = rgb([255, 236, 190], 0.25 + 0.6 * dark)
@@ -368,7 +368,7 @@ function drawRear(ctx, L) {
   ctx.lineWidth = 0.9
   ctx.beginPath(); ctx.moveTo(-(w / 2 - 38), ly + 5); ctx.lineTo(w / 2 - 38, ly + 5); ctx.stroke()
   // bumper with reflectors and an exhaust tip
-  const py = -ride - body * 0.4
+  const py = -ride - body * 0.46
   ctx.fillStyle = 'rgba(0,0,0,0.55)'
   rr(ctx, -w / 2 + 14, py + PLATE.h + 4, w - 28, 5, 2.5); ctx.fill()
   ctx.fillStyle = `rgba(200,30,30,${0.6 + 0.3 * dark})`
@@ -384,11 +384,13 @@ function drawPlate(ctx, text, pl, light, s) {
   ctx.strokeStyle = '#141414'
   ctx.lineWidth = 0.9
   rr(ctx, pl.x + 1, pl.y + 1, pl.w - 2, pl.h - 2, 1); ctx.stroke()
-  if (s * pl.h < 6.5) return // draw the characters once they would be legible on screen
+  if (s * pl.h < 6) return // draw the characters once they would be legible on screen
   ctx.fillStyle = '#111'
-  ctx.font = '700 9.6px "JetBrains Mono Variable", ui-monospace, monospace'
+  ctx.font = `700 ${pl.h * 0.72}px "JetBrains Mono Variable", ui-monospace, monospace`
   ctx.textAlign = 'center'
-  ctx.fillText(text, 0, pl.y + 9.9)
+  ctx.textBaseline = 'middle'
+  ctx.fillText(text, pl.x + pl.w / 2, pl.y + pl.h / 2 + 0.6)
+  ctx.textBaseline = 'alphabetic'
   ctx.textAlign = 'left'
 }
 
@@ -421,7 +423,8 @@ export function drawGlare(ctx, geo, s, dark, rear) {
  * Magnified plate crops, like an ANPR read-out, set just ahead of each car whose plate box was kept:
  * below the bumper for oncoming cars, above the roof for cars driving away.
  */
-export function drawCrops(ctx, crops, W, H, now) {
+export function drawCrops(ctx, crops, X0, X1, H, now) {
+  const W = X1 - X0 // visible width; crops are kept between X0 and X1
   crops.forEach(({ det, geo, dir, born }) => {
     const k = Math.min(1, (now - born) / 0.25)
     const e = 1 - (1 - k) ** 3
@@ -431,10 +434,10 @@ export function drawCrops(ctx, crops, W, H, now) {
     // beside the car, on the outside of its lane, level with the plate; above the roof if there is no room
     const out = dir > 0 ? 1 : -1
     const side = bx + bw / 2 + out * (geo.width / 2 + 14 + cw / 2)
-    const roomy = side - cw / 2 - 5 > 6 && side + cw / 2 + 5 < W - 6
+    const roomy = side - cw / 2 - 5 > X0 + 6 && side + cw / 2 + 5 < X1 - 6
     let cx = roomy ? side : bx + bw / 2
     let cy = roomy ? by + bh / 2 - boxH / 2 + 5 : by - geo.width * 0.75 - boxH
-    cx = Math.max(cw / 2 + 10, Math.min(W - cw / 2 - 10, cx))
+    cx = Math.max(X0 + cw / 2 + 10, Math.min(X1 - cw / 2 - 10, cx))
     cy = Math.max(34, Math.min(H - boxH - 30, cy))
     // leader from the plate box to the crop
     ctx.globalAlpha = e
@@ -469,7 +472,7 @@ export function drawCrops(ctx, crops, W, H, now) {
     ctx.font = '600 9.5px "JetBrains Mono Variable", ui-monospace, monospace'
     ctx.fillStyle = '#ff6a2c'
     ctx.textAlign = 'left'
-    ctx.fillText(`#${det.car} ${dir > 0 ? 'front' : 'rear'}`, -cw / 2, chh / 2 + 13)
+    ctx.fillText(cw < 104 ? `#${det.car}` : `#${det.car} ${dir > 0 ? 'front' : 'rear'}`, -cw / 2, chh / 2 + 13)
     ctx.textAlign = 'right'
     ctx.fillText(det.conf.toFixed(2), cw / 2, chh / 2 + 13)
     ctx.textAlign = 'left'

@@ -1111,10 +1111,10 @@ export default function CatVisit() {
 /** The line at the foot of the page, once she has visited (on this visit or before). */
 export function CatTally() {
   const t = useCatTally()
-  if (!t.visits && !t.tamedAll && !t.ranAll) return null
+  if (!t.visits && !t.tamedAll) return null
   return (
     <p className="mt-2 hidden font-mono text-[11px] leading-relaxed text-mute md:block">
-      Cats tamed: {t.tamed} ({t.tamedAll} across visits). Ran away: {t.ran} ({t.ranAll} across visits).{' '}
+      Cats tamed: {t.tamed} ({t.tamedAll} across visits).{' '}
       {!t.present && (
         <button type="button" onClick={callCat} className="text-signal underline decoration-signal/40 underline-offset-2 hover:decoration-signal">
           call her back

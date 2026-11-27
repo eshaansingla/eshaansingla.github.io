@@ -46,8 +46,8 @@ const MOCKS = [
 ]
 const MEOWS = ['Meow!', 'Mrrp?', 'Meow.', 'Mrrrow!', 'Mew!']
 
-// a full "m-e-ow": a buzzy voice source shaped by three moving vowel resonances (formants),
-// the pitch rising into the "e" and falling through the "ow", with a little breath and vibrato
+// a kitten's "mew": high and thin, a clear tone with a little reed in it, rising then falling,
+// shaped by bright vowel resonances, with a breath at the start and a tiny vibrato
 let audio = null
 function meowSound(pitch = 1, len = 1) {
   try {
@@ -55,62 +55,63 @@ function meowSound(pitch = 1, len = 1) {
     if (!AC) return
     audio = audio || new AC()
     if (audio.state === 'suspended') audio.resume()
-    const ac = audio, t = ac.currentTime + 0.01, d = 0.82 * len
+    const ac = audio, t = ac.currentTime + 0.01, d = 0.55 * len
     const at = (k) => t + d * k
-    const out = ac.createGain(); out.gain.value = 0.9
-    const comp = ac.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 4
-    out.connect(comp); comp.connect(ac.destination)
+    const env = ac.createGain()
+    const comp = ac.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 3
+    env.connect(comp); comp.connect(ac.destination)
 
-    // voice: a sawtooth and a softer square an octave up, with vibrato that deepens towards the end
-    const src = ac.createGain()
-    const o1 = ac.createOscillator(), o2 = ac.createOscillator(), o2g = ac.createGain()
-    o1.type = 'sawtooth'; o2.type = 'square'; o2g.gain.value = 0.18
-    o1.connect(src); o2.connect(o2g); o2g.connect(src)
-    const f0 = [[0, 380], [0.1, 520], [0.3, 760], [0.5, 690], [0.8, 500], [1, 400]]
-    for (const o of [o1, o2]) {
-      const m = o === o2 ? 2 : 1
-      o.frequency.setValueAtTime(f0[0][1] * pitch * m, t)
-      for (const [k, f] of f0.slice(1)) o.frequency.linearRampToValueAtTime(f * pitch * m, at(k))
+    // the voice: mostly a pure tone, a little sawtooth for the reedy edge
+    const f0 = [[0, 720], [0.14, 960], [0.34, 1180], [0.58, 1080], [0.84, 880], [1, 760]]
+    const sine = ac.createOscillator(), saw = ac.createOscillator()
+    sine.type = 'sine'; saw.type = 'sawtooth'
+    for (const o of [sine, saw]) {
+      o.frequency.setValueAtTime(f0[0][1] * pitch, t)
+      for (const [k, f] of f0.slice(1)) o.frequency.linearRampToValueAtTime(f * pitch, at(k))
     }
     const vib = ac.createOscillator(), vg = ac.createGain()
-    vib.frequency.value = 6.5
-    vg.gain.setValueAtTime(4, t); vg.gain.linearRampToValueAtTime(18, at(0.9))
-    vib.connect(vg); vg.connect(o1.frequency); vg.connect(o2.frequency)
+    vib.frequency.value = 9
+    vg.gain.setValueAtTime(3, t); vg.gain.linearRampToValueAtTime(14, at(0.9))
+    vib.connect(vg); vg.connect(sine.frequency); vg.connect(saw.frequency)
 
-    // breath, mostly at the start
-    const noise = ac.createBufferSource(), nb = ac.createBuffer(1, ac.sampleRate * d, ac.sampleRate)
-    const nd = nb.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1
-    noise.buffer = nb
-    const nf = ac.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 3200; nf.Q.value = 0.8
-    const ng = ac.createGain(); ng.gain.setValueAtTime(0.0001, t); ng.gain.linearRampToValueAtTime(0.05, at(0.08)); ng.gain.linearRampToValueAtTime(0.012, at(0.5)); ng.gain.linearRampToValueAtTime(0.0001, at(1))
-    noise.connect(nf); nf.connect(ng); ng.connect(out)
+    const sineG = ac.createGain(); sineG.gain.value = 0.55
+    sine.connect(sineG); sineG.connect(env)
+    const sawLP = ac.createBiquadFilter(); sawLP.type = 'lowpass'; sawLP.frequency.value = 5200
+    const sawG = ac.createGain(); sawG.gain.value = 0.5
+    saw.connect(sawLP); sawLP.connect(sawG)
 
-    // the vowel: three resonances gliding m -> ee -> ow
+    // bright, small-mouthed vowel: "m" closing into "ee" and opening to a short "ew"
     const formants = [
-      [[0, 280], [0.12, 520], [0.35, 600], [0.6, 780], [1, 650]],
-      [[0, 1100], [0.12, 1900], [0.32, 2300], [0.55, 1500], [1, 950]],
-      [[0, 2600], [0.2, 3100], [0.5, 2900], [1, 2500]],
+      [[0, 800], [0.2, 1150], [0.5, 1250], [1, 950]],
+      [[0, 2100], [0.25, 2900], [0.55, 2600], [1, 2000]],
+      [[0, 3800], [0.4, 4300], [1, 3700]],
     ]
-    const fg = [1, 0.7, 0.35]
+    const fg = [0.9, 0.55, 0.22]
     formants.forEach((track, i) => {
-      const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = i === 0 ? 4 : 7
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = [3, 6, 8][i]
       bp.frequency.setValueAtTime(track[0][1], t)
       for (const [k, f] of track.slice(1)) bp.frequency.linearRampToValueAtTime(f, at(k))
       const g = ac.createGain(); g.gain.value = fg[i]
-      src.connect(bp); bp.connect(g); g.connect(out)
+      sawG.connect(bp); bp.connect(g); g.connect(env)
     })
 
-    // loudness: a soft hum for the "m", opening up, then trailing off
-    const env = ac.createGain()
-    out.disconnect(); out.connect(env); env.connect(comp)
+    // a soft breath at the start
+    const noise = ac.createBufferSource(), nb = ac.createBuffer(1, Math.ceil(ac.sampleRate * d), ac.sampleRate)
+    const nd = nb.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1
+    noise.buffer = nb
+    const nf = ac.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = 4500; nf.Q.value = 1
+    const ng = ac.createGain(); ng.gain.setValueAtTime(0.0001, t); ng.gain.linearRampToValueAtTime(0.025, at(0.08)); ng.gain.linearRampToValueAtTime(0.0001, at(0.5))
+    noise.connect(nf); nf.connect(ng); ng.connect(env)
+
+    // loudness: a quick soft start, a full middle, and a gentle trail
     env.gain.setValueAtTime(0.0001, t)
-    env.gain.exponentialRampToValueAtTime(0.06, at(0.07))
-    env.gain.exponentialRampToValueAtTime(0.32, at(0.2))
-    env.gain.setValueAtTime(0.32, at(0.55))
-    env.gain.exponentialRampToValueAtTime(0.11, at(0.85))
+    env.gain.exponentialRampToValueAtTime(0.08, at(0.06))
+    env.gain.exponentialRampToValueAtTime(0.26, at(0.2))
+    env.gain.setValueAtTime(0.26, at(0.6))
+    env.gain.exponentialRampToValueAtTime(0.08, at(0.88))
     env.gain.exponentialRampToValueAtTime(0.0001, at(1))
 
-    for (const n of [o1, o2, vib, noise]) { n.start(t); n.stop(at(1) + 0.03) }
+    for (const n of [sine, saw, vib, noise]) { n.start(t); n.stop(at(1) + 0.03) }
   } catch { /* no sound */ }
 }
 
@@ -258,7 +259,7 @@ export default function CatVisit() {
 
     const meow = (text, len = 1) => {
       const c = cat
-      c.meowT = 0.8 * len
+      c.meowT = 0.55 * len
       c.tiltT = 1.3; c.tiltDir = Math.random() < 0.5 ? -1 : 1
       if (c.t > c.meowAt) { meowSound(rnd(0.9, 1.15), len * rnd(0.85, 1.2)); c.meowAt = c.t + 0.7 }
       if (text) say(text, 1500)
@@ -724,7 +725,7 @@ export default function CatVisit() {
       }[pose] || POSES.sit
       const target = {
         ...base,
-        mouth: Math.max(c.mouth, c.meowT > 0 ? Math.sin(clamp(c.meowT / 0.8, 0, 1) * Math.PI) * 0.6 : 0),
+        mouth: Math.max(c.mouth, c.meowT > 0 ? Math.sin(clamp(c.meowT / 0.55, 0, 1) * Math.PI) * 0.5 : 0),
         eye: pose === 'loaf' ? 0 : pose === 'stretch' ? 0.25 : pose === 'groom' ? 0.3 : 1,
       }
       if (c.earBackT > 0) target.ear = 0.9

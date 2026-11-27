@@ -138,8 +138,6 @@ const code = (n, label = 'code ↗') => (
   <a className="text-signal hover:underline" href={refs[n].href} target="_blank" rel="noreferrer">{label}</a>
 )
 
-const fmt = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
-const statsDate = fmt([competitive.leetcode.updated, competitive.codeforces.updated].sort().pop())
 const rlMain = rocketLeague.playlists.find((x) => x.main) ?? rocketLeague.playlists[0]
 const rlWins = rocketLeague.lifetime.find((x) => x.k === 'Wins')?.v ?? 0
 const rlBest = rocketLeague.lifetime.filter((x) => x.top).sort((a, b) => parseFloat(a.top.replace(/\D+/, '')) - parseFloat(b.top.replace(/\D+/, '')))[0]
@@ -321,7 +319,7 @@ export default function Paper() {
           ))}
         </dl>
       </Row>
-      <Row className="mt-10" note={`Pulled from LeetCode and Codeforces every hour; last changed ${statsDate}.`}>
+      <Row className="mt-10" note="Pulled from LeetCode and Codeforces every hour.">
         <p className="smallcaps mb-3 text-mute">Competitive programming</p>
         <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2">
           <a href={lc.href} target="_blank" rel="noreferrer" className="group block rounded-xl border border-rule-2 bg-paper p-4 transition-colors hover:border-ink">

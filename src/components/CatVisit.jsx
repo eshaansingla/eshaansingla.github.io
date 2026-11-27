@@ -57,7 +57,7 @@ export default function CatVisit() {
     const coarse = matchMedia('(pointer: coarse)').matches
     const fine = matchMedia('(hover: hover) and (pointer: fine)').matches
 
-    let cat = null, raf = 0, prev = 0, nextAt = performance.now() + 20000, noteTimer = 0
+    let cat = null, raf = 0, prev = 0, nextAt = performance.now() + rnd(8000, 14000), noteTimer = 0
     let px = null, py = null, pvx = 0, pvy = 0, lastMove = 0
     let colours = { fur: '#c2410c', eye: '#111110', ink: '#121212', mute: '#6a675f' }
     let lastScrollY = scrollY, lastScrollT = performance.now(), scrollV = 0
@@ -124,7 +124,7 @@ export default function CatVisit() {
       wrap.current.style.display = 'none'
       nt.style.opacity = '0'
       cancelAnimationFrame(raf); raf = 0
-      nextAt = performance.now() + (coarse ? rnd(60000, 120000) : rnd(45000, 100000))
+      nextAt = performance.now() + (coarse ? rnd(30000, 70000) : rnd(25000, 60000))
       setTally({ present: false })
     }
 
@@ -179,10 +179,10 @@ export default function CatVisit() {
         else { pop('heart', 3, 8); cat.purrT = 2; cat.slowBlink = 0.01; if (s === 'doze') { cat.breath = false; go('sit') } }
         return
       }
-      if (['run', 'mock', 'startle', 'hop', 'pounce'].includes(s)) return
+      if (['run', 'mock', 'startle'].includes(s)) return
+      if (s === 'hop' || s === 'pounce') { cat.lift = 0 }
       // on a touch screen a cat on the move may still slip away
-      if (coarse && s === 'walk' && Math.random() < 0.5) { miss(); return }
-      if (coarse && Math.random() < 0.2) { miss(); return }
+      if (coarse && s === 'walk' && Math.random() < 0.25) { miss(); return }
       tame()
     }
 
@@ -217,7 +217,6 @@ export default function CatVisit() {
       switch (c.state) {
         case 'walk':
           pose = 'walk'
-          if (fine && !c.tamed && c.then !== 'gone' && d < 130 && speed > 900 && approaching) { startle(); break }
           move(() => {
             if (c.then === 'gone') { finish(); return }
             if (c.then === 'sit' && !c.tamed) faceIn()
@@ -236,9 +235,8 @@ export default function CatVisit() {
           pose = 'sit'
           if (!c.tamed) faceIn()
           else if (pointerLive) faceTo(px)
-          if (fine && !c.tamed && d < 140 && speed > 900 && approaching) { startle(); break }
           // a pointer wriggling low near her is a toy
-          if (fine && pointerLive && inZone && L.mode === 'margin' && py > floor - 26 * u && speed > 120 && speed < 900 && c.t > c.pounceAt) {
+          if (fine && pointerLive && inZone && L.mode === 'margin' && py > floor - 26 * u && Math.abs(px - c.x) > 18 * u && speed > 120 && speed < 900 && c.t > c.pounceAt) {
             c.pounceAt = c.t + rnd(5, 9)
             c.target = clamp(px, L.x0, L.x1)
             if (Math.abs(c.target - c.x) > 4 * u) { faceTo(c.target); go('stalk'); break }
@@ -441,6 +439,7 @@ export default function CatVisit() {
         px8[i] = col[0]; px8[i + 1] = col[1]; px8[i + 2] = col[2]; px8[i + 3] = 255
       }
       lc.putImageData(img, 0, 0)
+      c.mask = { data: px8, lw, lh, P }
 
       const W = lw * P, H = lh * P
       if (cv.width !== Math.round(W * dpr)) {
@@ -506,20 +505,35 @@ export default function CatVisit() {
       px = e.clientX; py = e.clientY; lastMove = t
     }
     const onOut = (e) => { if (!e.relatedTarget) px = py = null }
+    // is this point on her (or within a finger's width of her)?
+    const onCat = (x, y) => {
+      const m = cat?.mask
+      if (!m) return false
+      const r = cv.getBoundingClientRect()
+      const cx = Math.floor((x - r.left) / m.P), cy = Math.floor((y - r.top) / m.P)
+      const tol = Math.ceil((coarse ? 14 : 8) / m.P)
+      for (let j = -tol; j <= tol; j++) for (let i = -tol; i <= tol; i++) {
+        const xx = cx + i, yy = cy + j
+        if (xx < 0 || yy < 0 || xx >= m.lw || yy >= m.lh) continue
+        if (m.data[(yy * m.lw + xx) * 4 + 3] > 0) return true
+      }
+      return false
+    }
     const onDownAnywhere = (e) => {
       if (!cat || e.target === hb) return
+      if (onCat(e.clientX, e.clientY)) { tap(); return }
       const floor = innerHeight - 4
       const dd = Math.hypot(e.clientX - cat.x, e.clientY - (floor - 6 * cat.L.u))
       if (dd < 100) { px = e.clientX; py = e.clientY; miss() }
     }
     let lastTap = 0
-    const onHit = (e) => {
-      e.stopPropagation(); e.preventDefault()
+    function tap() {
       const t = performance.now()
       const dbl = t - lastTap < 320
       lastTap = t
       tryCatch(dbl)
     }
+    const onHit = (e) => { e.stopPropagation(); e.preventDefault(); tap() }
     const decay = setInterval(() => {
       if (performance.now() - lastMove > 150) { pvx = 0; pvy = 0 }
       scrollV *= 0.5
@@ -544,8 +558,6 @@ export default function CatVisit() {
     }
     const tick = setInterval(() => {
       if (cat || busy() || performance.now() < nextAt) return
-      if (!tally.visits && scrollY < innerHeight * 0.6) return
-      if (Math.random() < 0.3) { nextAt = performance.now() + rnd(8000, 20000); return } // keep it a surprise
       spawn()
     }, 1000)
     const onCall = () => { if (!cat) spawn() }

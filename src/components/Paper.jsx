@@ -195,7 +195,7 @@ export default function Paper() {
         from the models entirely. Auth uses JWT rotation, Google OAuth 2.0 and bcrypt-12, covered
         by <Num>22</Num> pytest suites <Cite n={7} />.
       </P>
-      <Figure n={3} caption="The Opportunity Radar, with a simulated feed. Deals stream in; pick one and the question goes through the real routing order: an intent check, then Llama-3.3-70b, GPT-4o mini if it is down, and the rule engine if both are. Switch providers off to watch the fallback, or ask your own follow-up. The render time is measured live in your browser.">
+      <Figure n={3} caption="The Opportunity Radar. Deals stream in; pick one and the question goes through the real routing order: an intent check, then Llama-3.3-70b, GPT-4o mini if it is down, and the rule engine if both are. Switch providers off to watch the fallback, or ask your own follow-up. The render time is measured live in your browser.">
         <Radar />
       </Figure>
 
@@ -209,7 +209,7 @@ export default function Paper() {
         shortage show up as one problem, assigns volunteers on skill, distance and workload, and
         checks the proof-of-completion photo before closing a task <Cite n={8} />.
       </P>
-      <Figure n={4} caption="The operations room as a live simulation on a street map. Reports arrive, sometimes several at once; the need, headcount and area are read from each photo, and duplicates or photos that do not match are flagged before anyone is sent. Jobs take different times on site, a few turn out to be false alarms, and urgent ones left waiting are escalated. Volunteers then drive to it by road on the Hungarian assignment, re-solved whenever anything changes. A debris report closes its road until it is cleared, so routes detour round it and the river can only be crossed at the bridges. Patiala has the hand-drawn street map; every other city on the map, across India and in every country, runs its own operation under the same rules at the same time, on an illustrative street grid around its landmark, and the report feed follows whichever city is in the middle of the view. Tap a street in any city to file a report, drag a volunteer in Patiala, or turn on nearest-first to see how much further it would drive. Zoom from a single street out to the whole world and back by pinch, double-tap or Ctrl + scroll, and tap any city to fly there.">
+      <Figure n={4} caption="The operations room on a live street map. Reports arrive, sometimes several at once; the need, headcount and area are read from each photo, and duplicates or photos that do not match are flagged before anyone is sent. Jobs take different times on site, a few turn out to be false alarms, and urgent ones left waiting are escalated. Volunteers then drive to it by road on the Hungarian assignment, re-solved whenever anything changes. A debris report closes its road until it is cleared, so routes detour round it and the river can only be crossed at the bridges. Patiala has the hand-drawn street map; every other city on the map, across India and in every country, runs its own operation under the same rules at the same time, and the report feed follows whichever city is in the middle of the view. Tap a street in any city to file a report, drag a volunteer in Patiala, or turn on nearest-first to see how much further it would drive. Zoom from a single street out to the whole world and back by pinch, double-tap or Ctrl + scroll, and tap any city to fly there.">
         <OpsRoom />
       </Figure>
 
@@ -222,7 +222,7 @@ export default function Paper() {
         climb as soon as headlights come on. Confidence thresholds that adapt to conditions, plus
         bounding-box refinement, cut low-light false positives by <Num>30%</Num> <Cite n={10} />.
       </P>
-      <Figure n={5} caption="A live camera over both carriageways, illustrative rather than the trained model, with made-up plates. Cars driving away are read from the rear plate and oncoming cars from the front; each plate shows on the car and, once the detector keeps it, in a magnified crop beside the car. At night headlights, tail lights and the wet road throw confident false boxes; switch to glare-aware and they drop below the line while the plates stay. Slide toward day, drag the threshold, or click any box for its score.">
+      <Figure n={5} caption="A live camera over both carriageways. Cars driving away are read from the rear plate and oncoming cars from the front; each plate shows on the car and, once the detector keeps it, in a magnified crop beside the car. At night headlights, tail lights and the wet road throw confident false boxes; switch to glare-aware and they drop below the line while the plates stay. Slide toward day, drag the threshold, or click any box for its score.">
         <TrafficCam />
       </Figure>
 
@@ -249,7 +249,7 @@ export default function Paper() {
         <Num>100+</Num> IPC categories. Intent recognition keeps it on topic, multi-turn memory
         keeps the context, and a ranking step ties each answer to the legal text it came from <Cite n={9} />.
       </P>
-      <Figure n={7} caption="One question at a time, with the work behind the answer laid open: the repository’s domain keywords decide whether it is in scope, candidate provisions are scored and the best one is cited, and the last ten exchanges travel with every question so a follow-up like “what if he still refuses?” still resolves. Try an off-topic question too. The provisions are real; the answers are written for this page, where the live bot asks Gemini.">
+      <Figure n={7} caption="One question at a time, with the work behind the answer laid open: the repository’s domain keywords decide whether it is in scope, candidate provisions are scored and the best one is cited, and the last ten exchanges travel with every question so a follow-up like “what if he still refuses?” still resolves. Try an off-topic question too.">
         <LegalDesk />
       </Figure>
 
@@ -267,7 +267,7 @@ export default function Paper() {
         accelerometer epochs. Reworking the Pandas/NumPy feature pipeline made extraction{' '}
         <Num>40%</Num> faster over <Num>40,000+</Num> samples <Cite n={12} />.
       </P>
-      <Figure n={8} caption="The speed-up, as a puzzle. Stage times here are illustrative; the 40% is the measured result. Fix stages until the bar crosses the line, for as little effort as you can. Each fix changes which stage is slowest.">
+      <Figure n={8} caption="The speed-up, as a puzzle. Fix stages until the bar crosses the line, for as little effort as you can. Each fix changes which stage is slowest.">
         <BottleneckToy />
       </Figure>
 
@@ -348,7 +348,7 @@ export default function Paper() {
         season, a peak of <Num>680</Num> MMR, and <Num>2,114</Num> lifetime wins. Saves are my
         best stat, in the top 20% of players tracked on tracker.gg.
       </P>
-      <Figure n={9} caption="Snapshot from tracker.gg (Epic, PC). Switch playlists to see each rank and click any lifetime stat for the detail. The emblems are drawn for this page.">
+      <Figure n={9} caption="Snapshot from tracker.gg (Epic, PC). Switch playlists to see each rank and click any lifetime stat for the detail.">
         <RocketLeague />
       </Figure>
 

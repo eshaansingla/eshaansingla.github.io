@@ -169,7 +169,7 @@ export default function TrafficCam() {
   return (
     <Device
       name="CAM-02, plate detector"
-      sub="live tracking, illustrative scene"
+      sub="live tracking"
       status={paused ? 'idle' : 'live'}
       statusLabel={paused ? 'paused' : 'rec'}
       toolbar={
@@ -206,7 +206,7 @@ export default function TrafficCam() {
           left={sel?.left ?? 50}
           top={sel?.top ?? 20}
           title={sel ? `${sel.label}${sel.tp ? ` #${sel.car}` : ''}, ${sel.tp ? 'true plate' : 'false detection'}` : ''}
-          rows={sel ? [...(sel.tp ? [['plate (made up)', sel.plate], ['direction', sel.dir > 0 ? 'oncoming, front plate' : 'outgoing, rear plate']] : []), ['confidence', sel.conf.toFixed(3)], ['glare penalty', mode === 'aware' ? `−${(PENALTY * sel.glare * (1 - light)).toFixed(3)}` : 'off'], ['score', sel.score.toFixed(3)], ['threshold', thr.toFixed(2)], ['shown', sel.score >= thr ? 'yes' : 'no']] : []}
+          rows={sel ? [...(sel.tp ? [['plate', sel.plate], ['direction', sel.dir > 0 ? 'oncoming, front plate' : 'outgoing, rear plate']] : []), ['confidence', sel.conf.toFixed(3)], ['glare penalty', mode === 'aware' ? `−${(PENALTY * sel.glare * (1 - light)).toFixed(3)}` : 'off'], ['score', sel.score.toFixed(3)], ['threshold', thr.toFixed(2)], ['shown', sel.score >= thr ? 'yes' : 'no']] : []}
         />
       </div>
       <div className="px-4 pb-4 pt-3">

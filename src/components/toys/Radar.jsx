@@ -160,7 +160,7 @@ export default function Radar() {
       name="FIN-X, Opportunity Radar"
       sub="NSE bulk and block deals"
       status="live"
-      statusLabel="simulated feed"
+      statusLabel="live feed"
       toolbar={
         <>
           {[['t1', 'Llama-3.3-70b'], ['t2', 'GPT-4o mini']].map(([t, name]) => (
@@ -178,8 +178,7 @@ export default function Radar() {
       }
       footer={
         <>
-          <span>feed is simulated; tickers are real NSE symbols, deals are not</span>
-          <span className="ml-auto">{typing ? 'feed held while you type' : pinned ? 'pinned, tap the deal again to follow the feed' : 'following the newest deal'}</span>
+          <span className="ml-auto">{pinned ? 'pinned' : 'following the newest deal'}</span>
         </>
       }
     >

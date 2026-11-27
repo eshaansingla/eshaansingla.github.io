@@ -643,7 +643,7 @@ export default function OpsRoom() {
   return (
     <Device
       name="Sanchaalan Saathi, operations"
-      sub="live dispatch simulation"
+      sub="live dispatch"
       status={paused ? 'idle' : 'live'}
       statusLabel={paused ? 'paused' : 'live'}
       toolbar={

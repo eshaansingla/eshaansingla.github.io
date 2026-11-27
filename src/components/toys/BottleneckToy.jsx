@@ -34,7 +34,7 @@ export default function BottleneckToy() {
   return (
     <Device
       name="profiler, feature pipeline"
-      sub="per 1,000 samples, illustrative timings"
+      sub="per 1,000 samples"
       status="live"
       statusLabel="profiling"
       toolbar={

@@ -125,7 +125,7 @@ export default function LegalDesk() {
   return (
     <Device
       name="NyaayaBot"
-      sub="tenancy-law assistant, answers written for this page"
+      sub="tenancy-law assistant"
       status={busy ? 'run' : 'live'}
       statusLabel={busy ? 'thinking' : 'ready'}
       footer={

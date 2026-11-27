@@ -11,6 +11,8 @@ export const POSES = {
     feet: { lf: [21, 0], rf: [24, 0], lh: [-17, 0], rh: [-14, 0] } },
   loaf: { hip: [-15, -12], sh: [13, -13], head: [11, -10], tilt: 0.05, ear: 0.1, eye: 0.35, mouth: 0, tail: [-0.45, -0.26, 0.02], gait: 0, mt: [-14, -1.5], tuck: 1,
     feet: { lf: [17, 0], rf: [15, 0], lh: [-6, 0], rh: [-4, 0] } },
+  lie: { hip: [-16, -12.5], sh: [14, -12.5], head: [12, -7], tilt: 0.1, ear: 0, eye: 1, mouth: 0, tail: [-0.3, -0.12, 0.06], gait: 0, mt: [-4, -6.5], tuck: 0,
+    feet: { lf: [21, -2], rf: [18, -1], lh: [-6, -2], rh: [-9, -1] } },
   stretch: { hip: [-19, -31], sh: [15, -12], head: [17, -4], tilt: 0.25, ear: 0.2, eye: 0.3, mouth: 0, tail: [1.3, 0.05, 0.04], gait: 0, mt: [-2, -8.5], tuck: 0,
     feet: { lf: [34, 0], rf: [31, 0], lh: [-16, 0], rh: [-13, 0] } },
 }
@@ -45,7 +47,7 @@ export function makePalette(accent) {
   return {
     base: rgba(o), lit: rgba(mix(o, W, 0.22)), dark: rgba(mix(o, K, 0.32)), deep: rgba(mix(o, K, 0.55)),
     far: rgba(mix(o, K, 0.3)), farLit: rgba(mix(o, K, 0.14)), farDark: rgba(mix(o, K, 0.5)),
-    light: rgba(mix(o, W, 0.42)), belly: rgba(mix(o, W, 0.62)), stripe: rgba(mix(o, K, 0.55), 0.55),
+    light: rgba(mix(o, W, 0.4)), belly: rgba(mix(o, W, 0.6)), stripe: rgba(mix(o, K, 0.5), 0.32),
     ear: '#eba49c', nose: '#c66f6a', eye: '#b8c63c', eyeDeep: '#7d8a1e',
   }
 }
@@ -299,9 +301,10 @@ export function drawCat(ctx, s) {
     const off = far ? 2.5 : 0
     const sh3 = far ? [F.farLit, F.far, F.farDark] : [F.lit, F.base, F.dark]
     const hp = [hip[0] + off, hip[1] + 2]
-    const pawH = foot(hl); pawH[0] += off
-    const hock = [pawH[0] + p.mt[0], pawH[1] + p.mt[1]]
-    const [knee] = ik(hp, hock, 15, 14, 1)
+    const scratching = s.scratch && !far
+    const pawH = scratching ? s.scratch.slice() : foot(hl); pawH[0] += off
+    const hock = scratching ? [pawH[0] - 9, pawH[1] + 7] : [pawH[0] + p.mt[0], pawH[1] + p.mt[1]]
+    const [knee] = ik(hp, hock, 15, 14, scratching ? -1 : 1)
     capsule(ctx, hp, knee, 11, 6.5, sh3)
     if (!far) {
       // the thigh muscle, which is most of what you see of a cat's back leg

@@ -5,6 +5,7 @@ import Paper from './components/Paper'
 import Cursor from './components/Cursor'
 import SideNav from './components/SideNav'
 import ResumePill from './components/ResumePill'
+import CatVisit from './components/CatVisit'
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
       <Paper />
       <SideNav />
       <ResumePill />
+      <CatVisit />
       <Cursor />
     </MotionConfig>
   )

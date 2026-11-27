@@ -1,3 +1,4 @@
+import { CatTally } from './CatVisit'
 import { lazy, useEffect, useState } from 'react'
 import { Cite, Figure, H2, H3, Num, P, Row } from './ui'
 import { Btn, Seg } from './kit'
@@ -398,6 +399,7 @@ export default function Paper() {
         <p className="font-mono text-[11px] leading-relaxed text-mute">
           © {new Date().getFullYear()} Eshaan Singla.
         </p>
+        <CatTally />
       </Row>
     </main>
   )

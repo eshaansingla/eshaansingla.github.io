@@ -252,7 +252,8 @@ export default function HardwareBench() {
           {/* close-up of the optical head */}
           <button
             onPointerEnter={(e) => e.pointerType === 'mouse' && setHot('head')}
-            onClick={() => setHot((h) => (h === 'head' ? null : 'head'))}
+            onPointerLeave={(e) => e.pointerType === 'mouse' && setHot((h) => (h === 'head' ? null : h))}
+            onClick={(e) => { const mouse = e.nativeEvent.pointerType === 'mouse'; setHot((h) => (mouse ? 'head' : h === 'head' ? null : 'head')) }}
             onFocus={() => setHot('head')}
             className={`relative mx-3 mb-3 flex max-w-[280px] items-stretch gap-2 rounded-xl border bg-paper/95 p-2 text-left shadow-lg backdrop-blur transition-colors sm:absolute sm:right-3 sm:top-3 sm:mx-0 sm:mb-0 sm:w-[52%] sm:max-w-[250px] ${hot === 'head' ? 'border-signal' : 'border-rule-2'}`}
           >
@@ -277,7 +278,7 @@ export default function HardwareBench() {
             <div className="flex min-w-0 flex-1 flex-col">
               <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-mute">inside the cup</p>
               <p className="mt-0.5 font-mono text-[9px] leading-tight text-ink-2">the spot follows the recorded disp_x and disp_y, magnified</p>
-              <p className="mt-1 font-mono text-[10px] text-signal">laser + 4 × BPW34, Rs 111</p>
+              <p className={`mt-1 font-mono text-[10px] text-signal transition-opacity duration-200 ${hot === 'head' ? 'opacity-100' : 'opacity-0'}`} aria-hidden={hot !== 'head'}>laser + 4 × BPW34, Rs 111</p>
               <p className="mt-auto font-mono text-[9px] text-mute">IR pulse, this window</p>
               <svg viewBox="0 0 300 40" preserveAspectRatio="none" className="h-8 w-full">
                 <path ref={trace} d="" fill="none" stroke="var(--signal)" strokeWidth="2" vectorEffect="non-scaling-stroke" />

@@ -13,6 +13,8 @@ export const POSES = {
     feet: { lf: [17, 0], rf: [15, 0], lh: [-6, 0], rh: [-4, 0] } },
   lie: { hip: [-16, -12.5], sh: [14, -12.5], head: [12, -7], tilt: 0.1, ear: 0, eye: 1, mouth: 0, tail: [-0.3, -0.12, 0.06], gait: 0, mt: [-4, -6.5], tuck: 0,
     feet: { lf: [21, -2], rf: [18, -1], lh: [-6, -2], rh: [-9, -1] } },
+  rear: { hip: [-9, -12], sh: [3, -45], head: [7, -15], tilt: -0.25, ear: 0, eye: 1, mouth: 0, tail: [-0.35, -0.18, 0.06], gait: 0, mt: [-15, -1.5], tuck: 0,
+    feet: { lf: [12, -30], rf: [9, -27], lh: [-3, 0], rh: [-1, 0] } },
   stretch: { hip: [-19, -31], sh: [15, -12], head: [17, -4], tilt: 0.25, ear: 0.2, eye: 0.3, mouth: 0, tail: [1.3, 0.05, 0.04], gait: 0, mt: [-2, -8.5], tuck: 0,
     feet: { lf: [34, 0], rf: [31, 0], lh: [-16, 0], rh: [-13, 0] } },
 }
@@ -167,7 +169,8 @@ function sideHead(ctx, s, F, p) {
   ear(true)
   const open = Math.max(0, Math.min(1, p.eye * (1 - (s.blink || 0))))
   ctx.save(); ctx.translate(5.6, -1.6); if (!F.flat) ctx.rotate(-0.12)
-  eye(ctx, F, open, 2.7, 2.3, [0.5, 0], s.pupil || 0.55)
+  const sl = s.look || [0, 0]
+  eye(ctx, F, open, 2.7, 2.3, [Math.max(-1.2, Math.min(1.4, 0.5 + sl[0] * (s.dir || 1) * 1.2)), Math.max(-1, Math.min(1, sl[1] * 1.1))], s.pupil || 0.55)
   ctx.restore()
   ctx.fillStyle = F.nose
   ctx.beginPath(); ctx.moveTo(12.4, 0.2); ctx.lineTo(13.6, 0.6); ctx.lineTo(12.9, 1.9); ctx.closePath(); ctx.fill()
@@ -189,7 +192,7 @@ function frontHead(ctx, s, F, p) {
   const ear = (sgn) => {
     ctx.save()
     ctx.translate(sgn * 6.4 + turn * 0.3, -7.2)
-    ctx.rotate(sgn * (0.18 + p.ear * 0.7) + (s.earTwitch && sgn > 0 ? Math.sin(t * 28) * 0.12 : 0))
+    ctx.rotate(sgn * (0.18 + p.ear * 0.7) + (s.earTwitch && sgn > 0 ? Math.sin(t * 28) * 0.12 : 0) + (s.earLook || 0) * 0.2)
     const g = ctx.createLinearGradient(0, -12, 0, 2)
     g.addColorStop(0, F.dark); g.addColorStop(1, F.base)
     ctx.fillStyle = g
@@ -215,7 +218,7 @@ function frontHead(ctx, s, F, p) {
   const open = Math.max(0, Math.min(1, p.eye * (1 - (s.blink || 0))))
   for (const sg of [-1, 1]) {
     ctx.save(); ctx.translate(sg * 4.7 + turn * 0.9, -0.4); if (!F.flat) ctx.rotate(sg * -0.16)
-    eye(ctx, F, open, 2.9, 2.5, [lk[0] * 1.15, lk[1] * 0.8], s.pupil || 0.5)
+    eye(ctx, F, open, 2.9, 2.5, [Math.max(-1.6, Math.min(1.6, lk[0] * 1.7)), Math.max(-1.2, Math.min(1.2, lk[1] * 1.2))], s.pupil || 0.5)
     ctx.restore()
   }
   ctx.fillStyle = F.nose
@@ -284,7 +287,7 @@ export function drawCat(ctx, s) {
   const tail = [P(-10, 7)]
   for (let i = 1; i <= 15; i++) {
     const k = i / 15
-    const a = back + lift0 + curl * i + amp * Math.sin(t * (s.flick ? 9 : 2.4) - i * 0.45) * (0.3 + k) + (s.swish || 0) * Math.sin(t * 6 - i * 0.5) * k
+    const a = back + lift0 + curl * i + amp * Math.sin(t * (s.flick ? 9 : 2.4) - i * 0.45) * (0.3 + k) + (s.swish || 0) * Math.sin(t * 6 - i * 0.5) * k + (s.tailHook || 0) * Math.max(0, i - 9) * 0.42
     const prev = tail[i - 1]
     tail.push([prev[0] + Math.cos(a) * 4.1, Math.min(-2, prev[1] + Math.sin(a) * 4.1)])
   }
@@ -323,8 +326,8 @@ export function drawCat(ctx, s) {
     ellipse(ctx, pawH[0] + 1.5, pawH[1] - 1.6, 3.6, 2.1)
     const sp = [sh[0] + off - 1, sh[1] + 3]
     const pawF = foot(fl); pawF[0] += off
-    const grooming = s.groom && !far
-    const target = grooming ? s.groom : [pawF[0] - 1, pawF[1] - 2.2]
+    const grooming = (s.groom && !far) || (s.paw2 && far)
+    const target = grooming ? (far ? [s.paw2[0] - off, s.paw2[1]] : s.groom) : [pawF[0] - 1, pawF[1] - 2.2]
     const [elbow, wrist] = ik(sp, target, 15.5, 15, grooming ? -1 : 1)
     capsule(ctx, sp, elbow, 10, 5.8, sh3)
     capsule(ctx, elbow, wrist, 5.4, 4, sh3)
@@ -367,7 +370,7 @@ export function drawCat(ctx, s) {
   } else legs(false)
 
   // neck, chest ruff and head
-  const hc = [sh[0] + p.head[0], sh[1] + p.head[1] + br * 0.4]
+  const hc = [sh[0] + p.head[0] + (s.headPush || 0), sh[1] + p.head[1] + br * 0.4 + (s.headPush || 0) * 0.3]
   capsule(ctx, P(L + 2, 3), hc, 15, 12, [F.lit, F.base, F.dark])
   ctx.fillStyle = F.light
   capsule(ctx, P(L + 6, -6), [hc[0] + 1, hc[1] + 5], 8, 7)

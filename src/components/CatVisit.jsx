@@ -38,6 +38,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 const pick = (a) => a[Math.floor(Math.random() * a.length)]
 const smooth01 = (x) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x) }
 const COL = 1040
+const MIN_W = 768 // no cat on phones: there is no room for her beside the text
 
 const MOCKS = [
   { kind: 'yawn', text: 'Missed. She yawns at you.' },
@@ -115,6 +116,43 @@ function meowSound(pitch = 1, len = 1) {
   } catch { /* no sound */ }
 }
 
+// real kitten mews (CC0 recordings, see public/sounds/README.txt), fetched the first time she mews;
+// the synthesised mew above stays as the fallback
+const MEW_FILES = [1, 2, 3, 4, 5, 6].map((i) => `${import.meta.env.BASE_URL}sounds/mew${i}.mp3`)
+let mews = null, mewLoading = null, lastMew = -1
+function loadMews() {
+  if (mews || mewLoading) return mewLoading
+  const AC = window.AudioContext || window.webkitAudioContext
+  if (!AC) return null
+  audio = audio || new AC()
+  mewLoading = Promise.all(MEW_FILES.map((u) => fetch(u).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(r.status))).then((b) => audio.decodeAudioData(b))))
+    .then((bufs) => { mews = bufs; return bufs })
+    .catch(() => { mews = []; return [] })
+  return mewLoading
+}
+function playMew(pitch = 1) {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext
+    if (!AC) return
+    audio = audio || new AC()
+    if (audio.state === 'suspended') audio.resume()
+    const go = () => {
+      if (!mews || !mews.length) { meowSound(pitch, 1); return }
+      let i = Math.floor(Math.random() * mews.length)
+      if (i === lastMew) i = (i + 1) % mews.length
+      lastMew = i
+      const src = audio.createBufferSource(), g = audio.createGain()
+      src.buffer = mews[i]
+      src.playbackRate.value = pitch // a little different every time
+      g.gain.value = 0.85
+      src.connect(g); g.connect(audio.destination)
+      src.start()
+    }
+    if (mews) go()
+    else { const p = loadMews(); if (p) p.then(go); else meowSound(pitch, 1) }
+  } catch { /* no sound */ }
+}
+
 function heart(ctx, x, y, s) {
   ctx.beginPath()
   ctx.moveTo(x, y + s * 0.35)
@@ -153,7 +191,7 @@ export default function CatVisit() {
     let px = null, py = null, pvx = 0, pvy = 0, lastMove = 0, stillSince = performance.now()
     let dark = false, palette = makePalette(), theme = { fur: '#c2410c', ink: '#121212', mute: '#6a675f' }
     let lastScrollY = scrollY, lastScrollT = performance.now(), scrollV = 0, scrollDir = 0
-    let touchDown = null, missCandidate = null
+    let touchDown = null, missCandidate = null, timeScale = 1, lastInput = performance.now()
     const ball = { on: false, x: 0, vx: 0, rot: 0, fade: 0 }
 
     const readTheme = () => {
@@ -164,7 +202,10 @@ export default function CatVisit() {
       palette = makePalette(theme.fur)
     }
 
-    const say = (text, ms = 2400) => {
+    let saidAt = 0
+    const say = (text, ms = 2400, soft = false) => {
+      if (soft && performance.now() - saidAt < 1500) return
+      saidAt = performance.now()
       nt.textContent = text
       nt.style.opacity = '1'
       clearTimeout(noteTimer)
@@ -210,6 +251,7 @@ export default function CatVisit() {
         leaveAt: coarse ? rnd(55, 90) : rnd(150, 260), friend: tally.tamedAll > 0, greeted: false,
         glance: null, glanceAt: 0, sleepy: h >= 22 || h < 6, wideT: 0, followUntil: 0, wiggle: false,
         paw: null, paw2: null, headPush: 0, tailHook: 0, nearSince: 0, yarnDone: false,
+        dirVis: L.side < 0 ? 1 : -1, squashT: 0, petRun: 0, petGap: 0, lastInteract: 0, groomMode: 'paw', peekT: 0, pupilNow: 0.5,
       }
       setTally({ present: true, visits: tally.visits + 1 })
       wrap.current.style.display = 'block'
@@ -261,7 +303,7 @@ export default function CatVisit() {
       const c = cat
       c.meowT = 0.55 * len
       c.tiltT = 1.3; c.tiltDir = Math.random() < 0.5 ? -1 : 1
-      if (c.t > c.meowAt) { meowSound(rnd(0.9, 1.15), len * rnd(0.85, 1.2)); c.meowAt = c.t + 0.7 }
+      if (c.t > c.meowAt) { playMew(rnd(0.94, 1.1)); c.meowAt = c.t + 0.7 }
       if (text) say(text, 1500)
     }
     const tame = (how) => {
@@ -285,6 +327,7 @@ export default function CatVisit() {
       if (s === 'doze') { go('stretch', { next: 'sit' }); c.wideT = 0.6 }
       if (s === 'hop' || s === 'pounce') { c.lift = 0; go('sit') }
       meow()
+      c.lastInteract = c.t
       if (!c.tamed) { tame('click'); return }
       keep(60)
       if (dbl && ['sit', 'tamed', 'stroll', 'lie'].includes(s)) { c.jump = { from: c.x, to: c.x, t: 0, dur: 0.42, h: 26 * c.L.K, then: 'sit' }; go('hop') }
@@ -297,17 +340,17 @@ export default function CatVisit() {
       const ok = (k) => (c.cool[k] || 0) <= c.t && c.last !== k
       const acts = [
         ['groom', 12], ['scratch', 8], ['yawn', c.sleepy ? 14 : 8], ['roll', c.tamed ? 9 : 5], ['knead', c.tamed ? 10 : 3],
-        ['lie', 9], ['doze', c.t > 25 ? (c.sleepy ? 14 : 7) : 0], ['glance', 16], ['thump', c.tamed ? 0 : 4],
+        ['lie', 9], ['doze', c.t > 25 ? (c.sleepy || performance.now() - lastInput > 25000 ? 16 : 7) : 0], ['glance', 16], ['thump', c.tamed ? 0 : 4],
         ['wander', L.mode === 'margin' ? 10 : 0], ['stroll', L.mode === 'margin' && fine && innerWidth > 1300 && !c.tamed ? 3 : 0],
         ['spin', L.mode === 'margin' ? 3 : 0], ['zoom', L.mode === 'margin' ? 2.5 : 0],
-        ['yarn', L.mode === 'margin' && fine && !c.yarnDone && c.t > 20 ? 6 : 0],
+        ['yarn', L.mode === 'margin' && fine && !c.yarnDone && c.t > 20 ? 6 : 0], ['sneeze', 2],
       ].filter(([k, w]) => w > 0 && ok(k))
       let r = Math.random() * acts.reduce((a, [, w]) => a + w, 0), act = 'glance'
       for (const [k, w] of acts) if ((r -= w) < 0) { act = k; break }
       if (force) act = force
       c.last = act
       switch (act) {
-        case 'groom': go('groom', { dur: rnd(2.2, 4.5) }); break
+        case 'groom': go('groom', { dur: rnd(2.2, 4.5), groomMode: pick(['paw', 'paw', 'face', 'chest']) }); break
         case 'scratch': go('scratch', { dur: rnd(1.6, 2.8) }); break
         case 'yawn': go('yawn', { dur: rnd(1.6, 2.2) }); break
         case 'roll': go('roll', { dur: rnd(3.6, 6) }); c.cool.roll = c.t + 25; break
@@ -320,6 +363,7 @@ export default function CatVisit() {
           const other = L.side < 0 ? innerWidth - L.m / 2 : L.m / 2
           go('walk', { goal: other, then: 'stroll', speed: 70 }); c.cool.stroll = c.t + 90; break
         }
+        case 'sneeze': go('sneeze', { dur: 1.1 }); c.cool.sneeze = c.t + 60; break
         case 'spin': go('spin', { dur: rnd(1.8, 2.6) }); c.cool.spin = c.t + 45; break
         case 'zoom': go('zoom', { legs: [L.x1, L.x0, rnd(L.x0, L.x1)].sort(() => (c.x > (L.x0 + L.x1) / 2 ? 1 : -1)), leg: 0 }); c.cool.zoom = c.t + 60; break
         case 'yarn': {
@@ -339,7 +383,7 @@ export default function CatVisit() {
 
     // ---------- the frame ----------
     const frame = (now) => {
-      const dt = Math.min(0.05, (now - prev) / 1000)
+      const dt = Math.min(0.05, (now - prev) / 1000) * timeScale
       prev = now
       if (!cat) { raf = 0; return }
       const c = cat, L = c.L, K = L.K
@@ -405,6 +449,7 @@ export default function CatVisit() {
             if (c.then === 'gone') { finish(); return }
             if (c.then === 'sit' && !c.tamed) faceIn()
             go(c.then)
+            if (c.mewOnArrive) { c.mewOnArrive = false; meow('Mew? (pay attention to me)') }
             if (c.then === 'sit' && c.friend && !c.greeted) { c.greeted = true; meow('Mrrp! She remembers you.'); c.slowBlink = 0.01; c.tailHookT = 3 }
           })
           break
@@ -436,6 +481,13 @@ export default function CatVisit() {
             }
           }
           if (c.t > c.leaveAt) { go('stretch', { next: 'leave' }); break }
+          if (c.tamed && c.t - c.lastInteract > 40 && (c.cool.attention || 0) < c.t) {
+            c.cool.attention = c.t + rnd(40, 60); c.lastInteract = c.t
+            if (fine && L.mode === 'margin' && px != null && Math.abs(px - c.x) > 80) {
+              walkTo(clamp(px, L.x0, L.x1), 'sit', 60); c.mewOnArrive = true
+            } else meow('Mew? (pay attention to me)')
+            break
+          }
           if ((c.idleAt -= dt) <= 0) { c.idleAt = rnd(3, 7); idle(c, L) }
           break
         }
@@ -485,6 +537,7 @@ export default function CatVisit() {
           if (c.zAt <= 0) { c.zAt = rnd(1, 1.6); c.fx.push({ g: 'z', x: 4, y: 0, vy: 14, life: 2, t: 0, d: 0, drift: 1 }) }
           // dreaming: an ear flicks, a whisker twitches
           if (Math.random() < dt * 0.5) c.twitchT = 0.25
+          c.peekT = Math.max(0, c.peekT - dt)
           if (c.st > c.dur) go('stretch', { next: 'sit' })
           break
         }
@@ -546,6 +599,32 @@ export default function CatVisit() {
         case 'thump':
           pose = 'sit'
           break
+        case 'sneeze': {
+          // a little wind-up, then the sneeze, then a shake of the head
+          pose = 'sit'
+          const st = c.st
+          c.sneezeTilt = st < 0.45 ? -0.22 * smooth01(st / 0.45) : st < 0.6 ? 0.3 : 0.3 * (1 - smooth01((st - 0.6) / 0.3))
+          c.headPush = st > 0.45 && st < 0.65 ? 3 : Math.max(0, c.headPush - dt * 10)
+          if (st > 0.45 && !c.sneezed) { c.sneezed = true; say('pff!', 900); c.blinkT = 0.3 }
+          if (st > c.dur) { c.sneezeTilt = 0; c.sneezed = false; c.shakeT = 0.4; go('sit') }
+          break
+        }
+        case 'annoyed': {
+          // petted too long: ears back, tail lashing, a warning bat, then she moves off a little
+          pose = 'sit'
+          c.earBackT = 0.3
+          c.wideT = 0.3
+          if (c.st > 0.25 && c.st < 0.65 && lp) {
+            const k = Math.sin(((c.st - 0.25) / 0.4) * Math.PI)
+            const sh = c.p.sh
+            c.paw = [sh[0] + 6 + (clamp(lp[0], sh[0] + 2, sh[0] + 28) - sh[0] - 6) * k, -2 + (clamp(lp[1], sh[1] - 16, -4) + 2) * k]
+          }
+          if (c.st > 1.3) {
+            if (L.mode === 'margin') walkTo(clamp(c.x + (Math.random() < 0.5 ? -1 : 1) * rnd(60, 110), L.x0, L.x1), 'sit', 60)
+            else go('sit')
+          }
+          break
+        }
         case 'spin': {
           // chasing her own tail
           pose = 'run'
@@ -623,6 +702,7 @@ export default function CatVisit() {
           c.lift = Math.sin(Math.PI * k) * j.h
           if (k >= 1) {
             c.lift = 0
+            c.squashT = 0.22
             if (j.then === 'mockStay') { faceIn(); const m = pick(MOCKS); go('mock', { mock: m.kind, leave: false }); say(m.text, 2600) }
             else go('sit')
           }
@@ -662,7 +742,8 @@ export default function CatVisit() {
       if (!cat) return
       if (c.state !== 'roll' && c.roll > 0) c.roll = Math.max(0, c.roll - dt * 2.5)
       if (!['yawn', 'stretch', 'mock', 'chatter'].includes(c.state) && c.mouth > 0) c.mouth = Math.max(0, c.mouth - dt * 3)
-      if (c.state !== 'sniff') c.headPush = Math.max(0, c.headPush - dt * 10)
+      if (c.state !== 'sniff' && c.state !== 'sneeze') c.headPush = Math.max(0, c.headPush - dt * 10)
+      if (c.state !== 'sneeze') c.sneezeTilt = 0
 
       // ---------- small life ----------
       if ((c.blinkAt -= dt) <= 0) { c.blinkAt = rnd(2.2, 5.5); c.blinkT = 0.16; if (Math.random() < 0.2) c.blinkAt = 0.3 } // sometimes a double blink
@@ -679,7 +760,7 @@ export default function CatVisit() {
       if ((c.swishAt -= dt) <= 0) { c.swishAt = rnd(3.5, 8); c.swishT = rnd(0.9, 1.8) }
       if (c.swishT > 0) c.swishT -= dt
       if (c.thumpT > 0) c.thumpT -= dt
-      const busyTail = c.swishT > 0 || c.state === 'stalk' || c.state === 'play' || (c.state === 'mock' && c.mock === 'back')
+      const busyTail = c.swishT > 0 || c.state === 'stalk' || c.state === 'play' || c.state === 'annoyed' || (c.state === 'mock' && c.mock === 'back')
       c.swish += ((busyTail ? 0.45 : 0.05) - c.swish) * Math.min(1, dt * 4)
       c.tailHookT = Math.max(0, (c.tailHookT || 0) - dt)
       c.tailHook += (((c.tailHookT > 0 || (c.tamed && c.purrT > 0)) && pose === 'sit' ? 1 : 0) - c.tailHook) * Math.min(1, dt * 4)
@@ -695,20 +776,29 @@ export default function CatVisit() {
       // petting: a slow pointer stroking her, or a finger dragged across her
       const strokingMouse = fine && px != null && onCatBox(px, py) && speed > 25 && speed < 900
       const strokingTouch = touchDown && touchDown.moved > 12 && touchDown.onCat
-      if ((strokingMouse || strokingTouch) && !['run', 'startle', 'zoom', 'spin'].includes(c.state)) {
+      if ((strokingMouse || strokingTouch) && !['run', 'startle', 'zoom', 'spin', 'annoyed'].includes(c.state) && (c.cool.pet || 0) < c.t) {
         c.petT += dt
         c.petTotal += dt
-        if (!c.tamed && c.petTotal > 1.2 && !['mock'].includes(c.state)) tame('pet')
-        else if (c.purrT <= 0) say('Purrr...', 1600)
-        c.purrT = 0.9
-        keep(30)
-        if (c.petT > 0.55) { c.petT = 0; pop('heart', 1, 8) }
+        c.petRun += dt; c.petGap = 0
+        c.lastInteract = c.t
+        if (c.tamed && c.petRun > (c.petLimit || (c.petLimit = rnd(5, 8)))) {
+          c.petRun = 0; c.petLimit = 0; c.cool.pet = c.t + 6; c.purrT = 0
+          go('annoyed'); say("Okay, that's enough petting.", 2000)
+        } else {
+          if (!c.tamed && c.petTotal > 1.2 && !['mock'].includes(c.state)) tame('pet')
+          else if (c.purrT <= 0) say('Purrr...', 1600, true)
+          c.purrT = 0.9
+          keep(30)
+          if (c.petT > 0.55) { c.petT = 0; pop('heart', 1, 8) }
+        }
       }
       c.purrT = Math.max(0, c.purrT - dt)
+      if (!(strokingMouse || strokingTouch)) { c.petGap += dt; if (c.petGap > 1.2) c.petRun = 0 }
 
       // eyes, ears and head: on the pointer if there is one, otherwise glancing about (or at the page as it scrolls)
       let tx = null, ty = null
       if (c.state === 'play' && ball.on) { tx = ball.x; ty = floor - 8 }
+      else if (c.selAt && c.selT > 0) { c.selT -= dt; [tx, ty] = c.selAt }
       else if (pointerLive) { tx = px; ty = py }
       else if (scrollV > 400) { tx = innerWidth / 2; ty = scrollDir > 0 ? 0 : innerHeight }
       else if (c.glance && (c.glanceAt -= dt) > 0) { [tx, ty] = c.glance }
@@ -726,11 +816,11 @@ export default function CatVisit() {
       const target = {
         ...base,
         mouth: Math.max(c.mouth, c.meowT > 0 ? Math.sin(clamp(c.meowT / 0.55, 0, 1) * Math.PI) * 0.5 : 0),
-        eye: pose === 'loaf' ? 0 : pose === 'stretch' ? 0.25 : pose === 'groom' ? 0.3 : 1,
+        eye: pose === 'loaf' ? (c.peekT > 0 ? 0.45 : 0) : pose === 'stretch' ? 0.25 : pose === 'groom' ? 0.3 : 1,
       }
       if (c.earBackT > 0) target.ear = 0.9
       if (pose === 'crouch' && c.wiggle) target.hip = [base.hip[0] + Math.sin(c.t * 22) * 1.6, base.hip[1]]
-      if (pose === 'groom') target.tilt = 0.45 + Math.sin(c.t * 9) * 0.06
+      if (pose === 'groom') target.tilt = c.groomMode === 'chest' ? 0.75 + Math.sin(c.t * 8) * 0.07 : c.groomMode === 'face' ? 0.15 + Math.sin(c.t * 5) * 0.12 : 0.45 + Math.sin(c.t * 9) * 0.06
       if (pose === 'scratch') target.tilt = 0.32
       if (c.thumpT > 0 && pose === 'sit') target.tail = [base.tail[0], base.tail[1], 0.22] // bored: the tail tip thumps
       if (pose === 'lie' && c.roll > 0.9) {
@@ -744,6 +834,13 @@ export default function CatVisit() {
       const tiltClick = c.tiltT > 0 ? Math.sin(Math.min(1, (1.3 - c.tiltT) / 0.25) * Math.PI * 0.5) * 0.3 * c.tiltDir * Math.min(1, c.tiltT / 0.3) : 0
       const tiltLook = c.face > 0.5 ? c.look[0] * c.dir * 0.08 : 0
       const shake = c.shakeT > 0 ? Math.sin(c.shakeT * 70) * 0.18 * (c.shakeT / 0.45) : 0
+      // turning round is a quick swing, not a flip
+      c.dirVis += (c.dir - c.dirVis) * Math.min(1, dt * 13)
+      const turn = Math.abs(c.dirVis) < 0.18 ? 0.18 * Math.sign(c.dirVis || c.dir) : c.dirVis
+      c.squashT = Math.max(0, c.squashT - dt)
+      const sq = c.squashT > 0 ? Math.sin((c.squashT / 0.22) * Math.PI) * 0.07 : 0
+      // cats' pupils open wide in the dark
+      c.pupilNow += ((c.wideT > 0 || pose === 'crouch' ? 0.95 : c.purrT > 0 ? 0.35 : dark ? 0.72 : 0.48) - c.pupilNow) * Math.min(1, dt * 6)
 
       // ---------- draw ----------
       const dpr = Math.min(2, devicePixelRatio || 1)
@@ -756,21 +853,25 @@ export default function CatVisit() {
       const lift = c.lift || 0
       ctx.setTransform(1, 0, 0, 1, 0, 0)
       ctx.clearRect(0, 0, cv.width, cv.height)
-      ctx.setTransform(dpr * K * c.dir, 0, 0, dpr * K, dpr * ox, dpr * (oy - lift))
+      ctx.setTransform(dpr * K * turn * (1 + sq * 0.6), 0, 0, dpr * K * (1 - sq), dpr * ox, dpr * (oy - lift))
       if (c.roll > 0) {
         // rolling over: turn the whole cat about the middle of her body
         const a = c.roll * Math.PI
         ctx.translate(0, -12.5); ctx.rotate(-a); ctx.translate(0, 12.5 - Math.sin(a) * 4)
       }
       const scratchAt = pose === 'scratch' ? [POSES.sit.sh[0] + 2, POSES.sit.sh[1] - 12 + Math.sin(c.t * 34) * 2.2] : null
-      const groomAt = pose === 'groom' ? [POSES.sit.sh[0] + 13 + Math.sin(c.t * 9) * 1.5, POSES.sit.sh[1] - 4] : null
+      // grooming: licking a paw, washing the face over an ear, or head down licking the chest
+      const groomAt = pose !== 'groom' ? null
+        : c.groomMode === 'face' ? [POSES.sit.sh[0] + 8 + Math.sin(c.t * 5) * 3, POSES.sit.sh[1] - 14 - Math.cos(c.t * 5) * 3]
+        : c.groomMode === 'chest' ? null
+        : [POSES.sit.sh[0] + 13 + Math.sin(c.t * 9) * 1.5, POSES.sit.sh[1] - 4]
       const box = drawCat(ctx, {
         pose: c.p, cyc: pose === 'jump' ? 0.3 : c.cyc, gaitKind: pose === 'run' || pose === 'jump' ? 'run' : 'walk', t: c.t,
-        palette, dark, dir: c.dir, face: c.face, look: c.look, blink,
-        pupil: c.wideT > 0 || pose === 'crouch' ? 0.95 : c.purrT > 0 ? 0.35 : 0.5,
+        palette, dark, dir: Math.sign(turn), face: c.face, look: c.look, blink,
+        pupil: c.pupilNow,
         breath: ['sit', 'loaf', 'lie', 'scratch', 'groom'].includes(pose) ? (pose === 'loaf' ? 1.6 : 0.8) : 0, purr: c.purrT > 0,
-        groom: groomAt || c.paw, paw2: c.paw2, scratch: scratchAt, swish: c.swish, flick: c.state === 'mock' && c.mock === 'back',
-        earTwitch: c.twitchT > 0, earLook: c.face > 0.5 ? c.look[0] * 0.8 : 0, headTilt: tiltClick + tiltLook + shake,
+        groom: groomAt || c.paw, paw2: c.paw2, scratch: scratchAt, swish: c.swish, flick: (c.state === 'mock' && c.mock === 'back') || c.state === 'annoyed',
+        earTwitch: c.twitchT > 0, earLook: c.face > 0.5 ? c.look[0] * 0.8 : 0, headTilt: tiltClick + tiltLook + shake + (c.sneezeTilt || 0),
         headPush: c.headPush, tailHook: c.tailHook,
       })
 
@@ -857,6 +958,8 @@ export default function CatVisit() {
         touchDown.x = e.clientX; touchDown.y = e.clientY
         touchDown.onCat = onCatBox(e.clientX, e.clientY)
       }
+      lastInput = performance.now()
+      if (cat && cat.state === 'doze') cat.peekT = 1.2
       if (e.pointerType !== 'mouse') return
       const t = performance.now()
       if (px == null || Math.hypot(e.clientX - px, e.clientY - py) > 3) stillSince = t
@@ -913,11 +1016,26 @@ export default function CatVisit() {
       scrollV *= 0.5
     }, 100)
     const onScroll = () => {
+      lastInput = performance.now()
       const t = performance.now()
       const dy = scrollY - lastScrollY
       scrollV = Math.max(scrollV, (Math.abs(dy) / Math.max(16, t - lastScrollT)) * 1000)
       if (dy) scrollDir = Math.sign(dy)
       lastScrollY = scrollY; lastScrollT = t
+    }
+    // back from another tab: she looks up, and a friend says hello
+    const onVis = () => {
+      if (document.hidden || !cat) return
+      cat.wideT = 0.8
+      if (cat.tamed && cat.state !== 'doze' && (cat.cool.welcome || 0) < cat.t) { cat.cool.welcome = cat.t + 60; meow('Mrrp? Welcome back.') }
+    }
+    // she glances at text you select
+    const onSel = () => {
+      if (!cat) return
+      const sel = getSelection()
+      if (!sel || sel.isCollapsed || !sel.rangeCount) return
+      const r = sel.getRangeAt(0).getBoundingClientRect()
+      if (r.width || r.height) { cat.selAt = [r.left + r.width / 2, r.top + r.height / 2]; cat.selT = 2 }
     }
     // she notices the lights change
     const mo = new MutationObserver(() => {
@@ -933,13 +1051,14 @@ export default function CatVisit() {
         document.querySelector('[aria-label="Close menu"]')
     }
     const tick = setInterval(() => {
-      if (cat || busy() || performance.now() < nextAt) return
+      if (cat || busy() || performance.now() < nextAt || innerWidth < MIN_W) return
       spawn()
     }, 1000)
-    const onCall = () => { if (!cat) spawn() }
+    const onCall = () => { if (!cat && innerWidth >= MIN_W) spawn() }
     // resizing or turning the phone: keep her inside her patch, or let her slip away if it is gone
     const onResize = () => {
       if (!cat) return
+      if (innerWidth < MIN_W) { finish(); return }
       const was = cat.L
       const L = layout(was.side)
       if (L.mode !== was.mode) { finish(); return }
@@ -948,7 +1067,7 @@ export default function CatVisit() {
       if (cat.x < -100 || cat.x > innerWidth + 100) finish()
     }
     // for testing: ?catdebug lets a script put her in a given state
-    if (/catdebug/.test(location.search)) window.__cat = { go: (st, x) => cat && go(st, x || {}), get: () => cat, idle: (a) => cat && idle(cat, cat.L, a) }
+    if (/catdebug/.test(location.search)) window.__cat = { go: (st, x) => cat && go(st, x || {}), get: () => cat, idle: (a) => cat && idle(cat, cat.L, a), speed: (n) => { timeScale = n }, ball: () => ball, raf: () => raf, vis: onVis }
 
     addEventListener('pointermove', onMove, { passive: true })
     addEventListener('pointerout', onOut)
@@ -960,6 +1079,8 @@ export default function CatVisit() {
     yb.addEventListener('pointerdown', onYarn)
     addEventListener('cat:call', onCall)
     addEventListener('resize', onResize)
+    document.addEventListener('visibilitychange', onVis)
+    document.addEventListener('selectionchange', onSel)
     return () => {
       clearInterval(tick); clearInterval(decay); cancelAnimationFrame(raf); clearTimeout(noteTimer); mo.disconnect()
       removeEventListener('pointermove', onMove); removeEventListener('pointerout', onOut)
@@ -970,6 +1091,8 @@ export default function CatVisit() {
       yb.removeEventListener('pointerdown', onYarn)
       removeEventListener('cat:call', onCall)
       removeEventListener('resize', onResize)
+      document.removeEventListener('visibilitychange', onVis)
+      document.removeEventListener('selectionchange', onSel)
     }
   }, [])
 
@@ -991,7 +1114,7 @@ export function CatTally() {
   const t = useCatTally()
   if (!t.visits && !t.tamedAll && !t.ranAll) return null
   return (
-    <p className="mt-2 font-mono text-[11px] leading-relaxed text-mute">
+    <p className="mt-2 hidden font-mono text-[11px] leading-relaxed text-mute md:block">
       Cats tamed: {t.tamed} ({t.tamedAll} across visits). Ran away: {t.ran} ({t.ranAll} across visits).{' '}
       {!t.present && (
         <button type="button" onClick={callCat} className="text-signal underline decoration-signal/40 underline-offset-2 hover:decoration-signal">

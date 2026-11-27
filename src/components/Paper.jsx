@@ -85,8 +85,11 @@ function ResultsTable() {
               <tr
                 key={proj + m}
                 onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }) } }}
+                tabIndex={0}
+                aria-label={`${proj}: ${m}, ${v}. Jump to the project`}
                 data-cursor
-                className="group border-b border-rule transition-colors hover:bg-paper"
+                className="group cursor-pointer border-b border-rule transition-colors hover:bg-paper focus-visible:bg-paper"
               >
                 <td className="py-2 pr-4 align-top text-[15px] text-mute">{proj}</td>
                 <td className="py-2 pr-4 text-[16px]">{m}</td>

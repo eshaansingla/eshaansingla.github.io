@@ -73,7 +73,10 @@ function analyse(q, history) {
   const scored = CLAUSES.map((c) => ({ ...c, score: ws.reduce((s, w) => s + (c.tags.some((t) => w.startsWith(t)) ? 1 : 0), 0) + (hits.length ? 0 : 0) }))
     .sort((a, b) => b.score - a.score)
   const lastTopic = [...history].reverse().find((h) => h.topic)?.topic
-  if (!hits.length && !lastTopic) return { ws, hits, scored, kind: 'refuse', text: REFUSAL }
+  // with no tenancy keyword, a question is only a follow-up if it points back at the conversation
+  // ("what if he still refuses?"); anything else ("who won the IPL final?") is refused even mid-conversation
+  const followUp = /\b(he|she|they|him|her|them|it|that|this|those|these|then|still|also|again|instead|but|what if|what about|and if)\b/i.test(q)
+  if (!hits.length && (!lastTopic || !followUp)) return { ws, hits, scored, kind: 'refuse', text: REFUSAL }
   if (!hits.length && lastTopic) {
     const s = scored.map((c) => (c.id === lastTopic ? { ...c, score: c.score + 2 } : c)).sort((a, b) => b.score - a.score)
     return { ws, hits, scored: s, kind: 'context', topic: lastTopic, text: FOLLOW[lastTopic] }

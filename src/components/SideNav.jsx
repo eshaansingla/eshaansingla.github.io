@@ -20,12 +20,13 @@ const ITEMS = [
 export default function SideNav() {
   const [active, setActive] = useState(null)
   useEffect(() => {
-    // the active section is the last heading that has passed the top third of the screen
+    // the active section is the last heading that has reached the band just under the header
+    // (a jump puts its heading at 84 px, so anything within 140 px of the top counts as current)
     const els = ITEMS.map(([id]) => document.getElementById(id)).filter(Boolean)
     let raf = 0
     const update = () => {
       raf = 0
-      const line = innerHeight * 0.33
+      const line = Math.min(140, innerHeight * 0.33)
       let cur = null
       els.forEach((el) => { if (el.getBoundingClientRect().top <= line) cur = el.id })
       setActive(cur)

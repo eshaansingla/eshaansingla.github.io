@@ -156,7 +156,6 @@ export default function Radar() {
 
   return (
     <Device
-      className="dark"
       name="FIN-X, Opportunity Radar"
       sub="NSE bulk and block deals"
       status="live"

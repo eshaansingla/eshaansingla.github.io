@@ -1,15 +1,28 @@
-import { useState } from 'react'
+import { lazy, useEffect, useState } from 'react'
 import { Cite, Figure, H2, H3, Num, P, Row } from './ui'
 import { Btn, Seg } from './kit'
-import HardwareBench from './toys/HardwareBench'
-import AuditFig from './toys/AuditFig'
-import Radar from './toys/Radar'
-import OpsRoom from './toys/OpsRoom'
-import TrafficCam from './toys/TrafficCam'
-import MetricRank from './toys/MetricRank'
-import LegalDesk from './toys/LegalDesk'
-import BottleneckToy from './toys/BottleneckToy'
-import RocketLeague from './toys/RocketLeague'
+// Each figure is its own chunk, so the text arrives first; all of them start loading as soon as the page is idle.
+const LOAD = {
+  HardwareBench: () => import('./toys/HardwareBench'),
+  AuditFig: () => import('./toys/AuditFig'),
+  Radar: () => import('./toys/Radar'),
+  OpsRoom: () => import('./toys/OpsRoom'),
+  TrafficCam: () => import('./toys/TrafficCam'),
+  MetricRank: () => import('./toys/MetricRank'),
+  LegalDesk: () => import('./toys/LegalDesk'),
+  BottleneckToy: () => import('./toys/BottleneckToy'),
+  RocketLeague: () => import('./toys/RocketLeague'),
+}
+const HardwareBench = lazy(LOAD.HardwareBench)
+const AuditFig = lazy(LOAD.AuditFig)
+const Radar = lazy(LOAD.Radar)
+const OpsRoom = lazy(LOAD.OpsRoom)
+const TrafficCam = lazy(LOAD.TrafficCam)
+const MetricRank = lazy(LOAD.MetricRank)
+const LegalDesk = lazy(LOAD.LegalDesk)
+const BottleneckToy = lazy(LOAD.BottleneckToy)
+const RocketLeague = lazy(LOAD.RocketLeague)
+const prefetch = () => Object.values(LOAD).forEach((f) => f())
 import { competitive, education, honors, profile, profileLinks, refs, rocketLeague, skills } from '../data'
 
 const RESULTS = [
@@ -24,7 +37,7 @@ const RESULTS = [
   ['Plates', 'Detection accuracy', '92%', 'custom-annotated set', 'lpd'],
   ['Plates', 'Low-light false positives', '−30%', 'one fixed threshold', 'lpd'],
   ['AETHER', 'Best ROUGE-L (greedy decoding)', '0.761', '5 other strategies', 'aether'],
-  ['NyaayaBot', 'Queries handled / IPC categories', '1,200+ / 100+', '', 'nyaaya'],
+  ['NyaayaBot', 'Tenancy-law queries handled', '1,200+', '', 'nyaaya'],
   ['Parkinson’s', 'Multimodal classification accuracy', '91%', '', 'experience'],
   ['Parkinson’s', 'False-negative rate', '−18%', 'logistic regression', 'experience'],
   ['Parkinson’s', 'Feature-extraction time, 40,000+ samples', '−40%', 'previous pipeline', 'experience'],
@@ -144,6 +157,11 @@ const rlBest = rocketLeague.lifetime.filter((x) => x.top).sort((a, b) => parseFl
 
 export default function Paper() {
   const lc = competitive.leetcode
+  useEffect(() => {
+    if ('requestIdleCallback' in window) { const id = requestIdleCallback(prefetch, { timeout: 1200 }); return () => cancelIdleCallback(id) }
+    const t = setTimeout(prefetch, 300)
+    return () => clearTimeout(t)
+  }, [])
   return (
     <main>
       {/* ───────────── 1 WORK ───────────── */}
@@ -163,7 +181,7 @@ export default function Paper() {
         it with a pulse sensor and a motion sensor at <Num>50 Hz</Num> and does no processing of
         its own, so every number can be reproduced from the raw recordings <Cite n={5} />.
       </P>
-      <Figure n={1} caption="The rig on a test dummy, replaying two real recordings. Elevated plays subject 83 M straining through the Valsalva manoeuvre; Not elevated plays subject 19 M lying flat. Pick any session, or click the timeline, to see the same person in another state. The rows are the actual CSV samples in the firmware’s format, the reflected spot follows the recorded displacement, and every 10 s window carries the score the repository’s final XGBoost model gave it, against the 0.54 threshold fixed on validation subjects. Both volunteers took part in the 146-subject study. Tap or hover any part for what it does and what it cost.">
+      <Figure n={1} ph={[1650, 1800, 1070]} caption="The rig on a test dummy, replaying two real recordings. Elevated plays subject 83 M straining through the Valsalva manoeuvre; Not elevated plays subject 19 M lying flat. Pick any session, or click the timeline, to see the same person in another state. The rows are the actual CSV samples in the firmware’s format, the reflected spot follows the recorded displacement, and every 10 s window carries the score the repository’s final XGBoost model gave it, against the 0.54 threshold fixed on validation subjects. Both volunteers took part in the 146-subject study. Tap or hover any part for what it does and what it cost.">
         <HardwareBench />
       </Figure>
       <P note={<>46,407 windows, 32 optical features<br />14 models, one protocol<br />test subjects scored once</>}>
@@ -179,7 +197,7 @@ export default function Paper() {
         baseline. The result held every time (Fig. 2), and the custom optics turned out to be
         what makes it work.
       </P>
-      <Figure n={2} caption="Seven attempts to break one result, every number taken from the repository. Run them, then open any row to see what it tests. Shuffled labels and elapsed time fall to chance, exactly as they should, while unseen subjects, recording batches and a simpler model all hold the result.">
+      <Figure n={2} ph={[950, 660, 530]} caption="Seven attempts to break one result, every number taken from the repository. Run them, then open any row to see what it tests. Shuffled labels and elapsed time fall to chance, exactly as they should, while unseen subjects, recording batches and a simpler model all hold the result.">
         <AuditFig />
       </Figure>
 
@@ -199,7 +217,7 @@ export default function Paper() {
         from the models entirely. Auth uses JWT rotation, Google OAuth 2.0 and bcrypt-12, covered
         by <Num>22</Num> pytest suites <Cite n={7} />.
       </P>
-      <Figure n={3} caption="The Opportunity Radar. Deals stream in; pick one and the question goes through the real routing order: an intent check, then Llama-3.3-70b, GPT-4o mini if it is down, and the rule engine if both are. Switch providers off to watch the fallback, or ask your own follow-up. The render time is measured live in your browser.">
+      <Figure n={3} ph={[1300, 690, 585]} caption="The Opportunity Radar. Deals stream in; pick one and the question goes through the real routing order: an intent check, then Llama-3.3-70b, GPT-4o mini if it is down, and the rule engine if both are. Switch providers off to watch the fallback, or ask your own follow-up. The render time is measured live in your browser.">
         <Radar />
       </Figure>
 
@@ -213,7 +231,7 @@ export default function Paper() {
         shortage show up as one problem, assigns volunteers on skill, distance and workload, and
         checks the proof-of-completion photo before closing a task <Cite n={8} />.
       </P>
-      <Figure n={4} caption="The operations room on a live street map. Reports arrive, sometimes several at once; the need, headcount and area are read from each photo, and duplicates or photos that do not match are flagged before anyone is sent. Jobs take different times on site, a few turn out to be false alarms, and urgent ones left waiting are escalated. Volunteers then drive to it by road on the Hungarian assignment, re-solved whenever anything changes. A debris report closes its road until it is cleared, so routes detour round it and the river can only be crossed at the bridges. Patiala has the hand-drawn street map; every other city on the map, across India and in every country, runs its own operation under the same rules at the same time, and the report feed follows whichever city is in the middle of the view. Tap a street in any city to file a report, drag a volunteer in Patiala, or turn on nearest-first to see how much further it would drive. Zoom from a single street out to the whole world and back by pinch, double-tap or Ctrl + scroll, and tap any city to fly there.">
+      <Figure n={4} ph={[1260, 480, 580]} caption="The operations room on a live street map. Reports arrive, sometimes several at once; the need, headcount and area are read from each photo, and duplicates or photos that do not match are flagged before anyone is sent. Jobs take different times on site, a few turn out to be false alarms, and urgent ones left waiting are escalated. Volunteers then drive to it by road on the Hungarian assignment, re-solved whenever anything changes. A debris report closes its road until it is cleared, so routes detour round it and the river can only be crossed at the bridges. Patiala has the hand-drawn street map; every other city on the map, across India and in every country, runs its own operation under the same rules at the same time, and the report feed follows whichever city is in the middle of the view. Tap a street in any city to file a report, drag a volunteer in Patiala, or turn on nearest-first to see how much further it would drive. Zoom from a single street out to the whole world and back by pinch, double-tap or Ctrl + scroll, and tap any city to fly there.">
         <OpsRoom />
       </Figure>
 
@@ -226,7 +244,7 @@ export default function Paper() {
         climb as soon as headlights come on. Confidence thresholds that adapt to conditions, plus
         bounding-box refinement, cut low-light false positives by <Num>30%</Num> <Cite n={10} />.
       </P>
-      <Figure n={5} caption="A live camera over both carriageways. Cars driving away are read from the rear plate and oncoming cars from the front; each plate shows on the car and, once the detector keeps it, in a magnified crop beside the car. At night headlights, tail lights and the wet road throw confident false boxes; switch to glare-aware and they drop below the line while the plates stay. Slide toward day, drag the threshold, or click any box for its score.">
+      <Figure n={5} ph={[680, 655, 775]} caption="A live camera over both carriageways. Cars driving away are read from the rear plate and oncoming cars from the front; each plate shows on the car and, once the detector keeps it, in a magnified crop beside the car. At night headlights, tail lights and the wet road throw confident false boxes; switch to glare-aware and they drop below the line while the plates stay. Slide toward day, drag the threshold, or click any box for its score.">
         <TrafficCam />
       </Figure>
 
@@ -241,7 +259,7 @@ export default function Paper() {
         search scored the lowest perplexity (<Num>8.82</Num>) yet matched the reference answers
         least closely.
       </P>
-      <Figure n={6} caption="Real results from AETHER’s evaluation run. Rank by perplexity and beam search wins; rank by agreement with a reference answer and it comes last. The metric you choose decides which strategy ships. Top-k and beam ran on a small local model, which is part of the story.">
+      <Figure n={6} ph={[720, 430, 430]} caption="Real results from AETHER’s evaluation run. Rank by perplexity and beam search wins; rank by agreement with a reference answer and it comes last. The metric you choose decides which strategy ships. Top-k and beam ran on a small local model, which is part of the story.">
         <MetricRank />
       </Figure>
 
@@ -249,11 +267,11 @@ export default function Paper() {
         NyaayaBot: a legal assistant that cites
       </H3>
       <P>
-        A Gemini-based assistant for Indian law that handled <Num>1,200+</Num> queries across{' '}
-        <Num>100+</Num> IPC categories. Intent recognition keeps it on topic, multi-turn memory
+        A Gemini-based assistant for Indian tenancy law that handled <Num>1,200+</Num> queries.
+        Intent recognition keeps it on topic, multi-turn memory
         keeps the context, and a ranking step ties each answer to the legal text it came from <Cite n={9} />.
       </P>
-      <Figure n={7} caption="One question at a time, with the work behind the answer laid open: the repository’s domain keywords decide whether it is in scope, candidate provisions are scored and the best one is cited, and the last ten exchanges travel with every question so a follow-up like “what if he still refuses?” still resolves. Try an off-topic question too.">
+      <Figure n={7} ph={[600, 495, 495]} caption="One question at a time, with the work behind the answer laid open: the repository’s domain keywords decide whether it is in scope, candidate provisions are scored and the best one is cited, and the last ten exchanges travel with every question so a follow-up like “what if he still refuses?” still resolves. Try an off-topic question too.">
         <LegalDesk />
       </Figure>
 
@@ -271,7 +289,7 @@ export default function Paper() {
         accelerometer epochs. Reworking the Pandas/NumPy feature pipeline made extraction{' '}
         <Num>40%</Num> faster over <Num>40,000+</Num> samples <Cite n={12} />.
       </P>
-      <Figure n={8} caption="The speed-up, as a puzzle. Fix stages until the bar crosses the line, for as little effort as you can. Each fix changes which stage is slowest.">
+      <Figure n={8} ph={[845, 520, 435]} caption="The speed-up, as a puzzle. Fix stages until the bar crosses the line, for as little effort as you can. Each fix changes which stage is slowest.">
         <BottleneckToy />
       </Figure>
 
@@ -352,7 +370,7 @@ export default function Paper() {
         season, a peak of <Num>{rocketLeague.allTimeBest.rating}</Num> MMR, and <Num>{rlWins.toLocaleString('en-IN')}</Num> lifetime wins.
         {rlBest && <> {rlBest.k} are my best stat, in the {rlBest.top.toLowerCase()} of players tracked on tracker.gg.</>}
       </P>
-      <Figure n={9} caption="Snapshot from tracker.gg (Epic, PC). Switch playlists to see each rank and click any lifetime stat for the detail.">
+      <Figure n={9} ph={[1180, 680, 525]} caption="Snapshot from tracker.gg (Epic, PC). Switch playlists to see each rank and click any lifetime stat for the detail.">
         <RocketLeague />
       </Figure>
 

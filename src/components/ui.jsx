@@ -1,3 +1,4 @@
+import { Suspense, useState } from 'react'
 import { motion } from 'framer-motion'
 import { refs } from '../data'
 import { EASE, useSeen } from './kit'
@@ -96,7 +97,23 @@ export function P({ children, note }) {
  * Figure plate. On first view a signal-coloured line traces the plate's outline, then the
  * contents rise in. Controls sit in a toolbar; caption is numbered like a paper.
  */
-export function Figure({ id, n, caption, children }) {
+/** On phones a long caption opens at three lines with a toggle for the rest; wider screens show it whole. */
+function Caption({ text }) {
+  const [open, setOpen] = useState(false)
+  const long = typeof text === 'string' && text.length > 170
+  return (
+    <span className="italic text-ink-2">
+      <span className={long && !open ? 'line-clamp-3 sm:line-clamp-none' : ''}>{text}</span>
+      {long && (
+        <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className="mt-1 font-mono text-[11.5px] not-italic text-signal sm:hidden">
+          {open ? 'less' : 'more'}
+        </button>
+      )}
+    </span>
+  )
+}
+
+export function Figure({ id, n, caption, children, ph = [900, 600, 600] }) {
   const [ref, seen] = useSeen('-120px')
   return (
     <figure id={id} className="mx-auto my-12 max-w-[1040px] px-5 md:px-8">
@@ -107,7 +124,10 @@ export function Figure({ id, n, caption, children }) {
           animate={{ opacity: seen ? 1 : 0, y: seen ? 0 : 18 }}
           transition={{ duration: 0.9, ease: EASE, delay: 0.15 }}
         >
-          {children}
+          {/* figures load just after the page does; until then a frame of the same size holds their place */}
+          <Suspense fallback={<div aria-hidden="true" className="h-[var(--ph0)] rounded-[16px] border border-rule-2 bg-paper md:h-[var(--ph1)] lg:h-[var(--ph2)]" style={{ '--ph0': `${ph[0]}px`, '--ph1': `${ph[1]}px`, '--ph2': `${ph[2]}px` }} />}>
+            {children}
+          </Suspense>
         </motion.div>
         {/* outline trace */}
         <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" aria-hidden="true">
@@ -123,7 +143,7 @@ export function Figure({ id, n, caption, children }) {
       </div>
       <figcaption className="mt-3.5 grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-1 text-[15px] leading-snug sm:grid-cols-[72px_1fr] xl:grid-cols-[72px_588px]">
         <span className="font-mono text-[12px] uppercase tracking-wider text-signal">Fig. {n}</span>
-        <span className="italic text-ink-2">{caption}</span>
+        <Caption text={caption} />
       </figcaption>
     </figure>
   )

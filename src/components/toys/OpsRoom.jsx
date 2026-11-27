@@ -97,7 +97,7 @@ export default function OpsRoom() {
       }
     }
     const byCity = new Map(), recent = [], recs = new Map()
-    let dirty = true, focusName = 'Patiala', lastFlush = 0, lastStats = -Infinity, lastAdd = 0, shown = []
+    let dirty = true, focusName, lastFlush = 0, lastStats = -Infinity, lastAdd = 0, shown = []
     // reports are filed under each place's key (names can repeat; keys cannot)
     const placeKey = (c) => c.key || c.n
     const record = (place, city, id, base) => {
@@ -590,7 +590,9 @@ export default function OpsRoom() {
   const gesture = useRef(null)
   const pointers = useRef(new Map())
   const tapTimer = useRef(null)
-  const [hint, setHint] = useState(false)
+  const [hint, setHint] = useState('')
+  const hintTimer = useRef(0)
+  const showHint = (text) => { setHint(text); clearTimeout(hintTimer.current); hintTimer.current = setTimeout(() => setHint(''), 1400) }
   const toMap = (e) => {
     const r = canvas.current.getBoundingClientRect()
     const v = view.current
@@ -618,7 +620,7 @@ export default function OpsRoom() {
     }
     if (pointers.current.size > 2) return
     const h = api.current.hit?.(p.x, p.y)
-    gesture.current = { h, start: p, last: p, moved: false }
+    gesture.current = { h, start: p, last: p, moved: false, touch: e.pointerType === 'touch', y: e.clientY }
   }
   const move = (e) => {
     if (!pointers.current.has(e.pointerId)) return
@@ -636,7 +638,12 @@ export default function OpsRoom() {
     if (Math.hypot(p.mx - g.start.mx, p.my - g.start.my) > 4) g.moved = true
     if (!g.moved) return
     if (g.h?.kind === 'v') api.current.drag(g.h.v, p.x, p.y)
-    else api.current.pan(p.mx - g.last.mx, p.my - g.last.my)
+    else if (g.touch) {
+      // one finger on a phone scrolls the page past the map; two fingers move the map
+      window.scrollBy(0, g.y - e.clientY)
+      g.y = e.clientY
+      showHint('Use two fingers to move the map')
+    } else api.current.pan(p.mx - g.last.mx, p.my - g.last.my)
     g.last = p
   }
   const up = (e) => {
@@ -686,7 +693,7 @@ export default function OpsRoom() {
     const el = wrap.current
     let t
     const wheel = (e) => {
-      if (!(e.ctrlKey || e.metaKey)) { setHint(true); clearTimeout(t); t = setTimeout(() => setHint(false), 1400); return }
+      if (!(e.ctrlKey || e.metaKey)) { setHint('Ctrl or ⌘ + scroll to zoom, or pinch'); clearTimeout(t); t = setTimeout(() => setHint(''), 1400); return }
       e.preventDefault()
       const r = canvas.current.getBoundingClientRect()
       const mx = ((e.clientX - r.left) / r.width) * MW, my = ((e.clientY - r.top) / r.height) * MH
@@ -726,7 +733,7 @@ export default function OpsRoom() {
       footer={
         <>
           <span>tap a street to file a report</span>
-          <span>drag to pan; pinch, double-tap or Ctrl + scroll to zoom; tap a city to fly there</span>
+          <span>drag to pan (two fingers on a phone); pinch, double-tap or Ctrl + scroll to zoom; tap a city to fly there</span>
           <span className="ml-auto">routes re-solved on every change</span>
         </>
       }
@@ -754,7 +761,7 @@ export default function OpsRoom() {
           <AnimatePresence>
             {hint && (
               <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="pointer-events-none absolute inset-x-0 top-1/2 mx-auto w-fit -translate-y-1/2 rounded-full bg-ink/80 px-3 py-1.5 font-mono text-[11px] text-canvas">
-                Ctrl or ⌘ + scroll to zoom, or pinch
+                {hint}
               </motion.p>
             )}
           </AnimatePresence>

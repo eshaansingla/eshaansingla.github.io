@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { Row, Num } from './ui'
 import { profile, profileLinks } from '../data'
+import ProjectIndex from './ProjectIndex'
 
 const EASE = [0.22, 1, 0.36, 1]
 // set at build time, so every deploy carries its own date
@@ -78,6 +79,7 @@ export default function TitleBlock() {
               Mail me ↗
             </a>
           </div>
+          <ProjectIndex />
         </motion.div>
       </Row>
 

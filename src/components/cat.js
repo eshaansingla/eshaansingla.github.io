@@ -35,6 +35,11 @@ const hex = (h) => { h = String(h).trim().replace('#', ''); if (h.length === 3) 
 const mix = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k))
 const rgba = (c, a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})`
 /** Fur colours built from the site's accent, so the cat is the same orange as the page. */
+/** Colour codes for the flat, pixel look: the caller recolours them after snapping to the pixel grid. */
+export const FLAT = {
+  flat: true, base: '#ff0000', lit: '#ff0000', dark: '#ff0000', deep: '#ff0000', far: '#00ff00', farLit: '#00ff00', farDark: '#00ff00',
+  light: '#ff0000', belly: '#ff0000', stripe: '#ff0000', ear: '#ff0000', nose: '#ff0000', eye: '#0000ff', eyeDeep: '#0000ff', mouth: '#0000ff',
+}
 export function makePalette(accent) {
   const o = hex(accent || '#c2410c'), W = [255, 255, 255], K = [10, 4, 0]
   return {
@@ -98,6 +103,14 @@ function ball(ctx, x, y, rx, ry, F, rot = 0) {
 }
 
 function eye(ctx, F, open, rx, ry, look, pupilW) {
+  if (F.flat) {
+    // a solid black eye, or a line when shut
+    ctx.fillStyle = F.eye
+    const lx = Math.max(-1, Math.min(1, look[0])) * 1.1, ly = Math.max(-1, Math.min(1, look[1])) * 0.8
+    if (open > 0.3) ctx.fillRect(-1.4 + lx, -2.3 + ly, 2.8, 4.6 * Math.min(1, open + 0.2))
+    else ctx.fillRect(-2.2, -0.2, 4.4, 1.4)
+    return
+  }
   if (open > 0.08) {
     const g = ctx.createRadialGradient(look[0] * 0.6, look[1] * 0.6, 0.2, 0, 0, rx)
     g.addColorStop(0, F.eye); g.addColorStop(1, F.eyeDeep)
@@ -119,6 +132,7 @@ function eye(ctx, F, open, rx, ry, look, pupilW) {
 }
 
 function whiskers(ctx, s, list) {
+  if (s.flat) return
   ctx.strokeStyle = s.dark ? 'rgba(248,240,228,0.6)' : 'rgba(80,52,30,0.38)'
   ctx.lineWidth = 0.45
   for (const [x0, y0, ex, ey] of list) { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo(x0 + (ex - x0) * 0.5, y0 + (ey - y0) * 0.25, ex, ey); ctx.stroke() }
@@ -150,13 +164,13 @@ function sideHead(ctx, s, F, p) {
   for (const [x0, y0, x1, y1] of [[-2, -8.6, 1, -4.5], [1.5, -8.4, 3.2, -4.8], [-5.5, -7, -2.5, -3.6]]) { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke() }
   ear(true)
   const open = Math.max(0, Math.min(1, p.eye * (1 - (s.blink || 0))))
-  ctx.save(); ctx.translate(5.6, -1.6); ctx.rotate(-0.12)
+  ctx.save(); ctx.translate(5.6, -1.6); if (!F.flat) ctx.rotate(-0.12)
   eye(ctx, F, open, 2.7, 2.3, [0.5, 0], s.pupil || 0.55)
   ctx.restore()
   ctx.fillStyle = F.nose
   ctx.beginPath(); ctx.moveTo(12.4, 0.2); ctx.lineTo(13.6, 0.6); ctx.lineTo(12.9, 1.9); ctx.closePath(); ctx.fill()
   if (p.mouth > 0.05) {
-    ctx.fillStyle = '#5b1f1c'; ellipse(ctx, 10.6, 4.4 + p.mouth * 1.6, 2.6, 0.6 + p.mouth * 2.8, 0.25)
+    ctx.fillStyle = F.mouth || '#5b1f1c'; ellipse(ctx, 10.6, 4.4 + p.mouth * 1.6, 2.6, 0.6 + p.mouth * 2.8, 0.25)
     ctx.fillStyle = '#d9737a'; ellipse(ctx, 10.2, 5.4 + p.mouth * 2.6, 1.6, 0.4 + p.mouth * 1.1, 0.25)
   } else {
     ctx.strokeStyle = F.deep; ctx.lineWidth = 0.6
@@ -198,14 +212,14 @@ function frontHead(ctx, s, F, p) {
   ellipse(ctx, mx - 2.5, 5.6, 3.4, 2.7); ellipse(ctx, mx + 2.5, 5.6, 3.4, 2.7); ellipse(ctx, mx, 8.2, 2.8, 1.8)
   const open = Math.max(0, Math.min(1, p.eye * (1 - (s.blink || 0))))
   for (const sg of [-1, 1]) {
-    ctx.save(); ctx.translate(sg * 4.7 + turn * 0.9, -0.4); ctx.rotate(sg * -0.16)
+    ctx.save(); ctx.translate(sg * 4.7 + turn * 0.9, -0.4); if (!F.flat) ctx.rotate(sg * -0.16)
     eye(ctx, F, open, 2.9, 2.5, [lk[0] * 1.15, lk[1] * 0.8], s.pupil || 0.5)
     ctx.restore()
   }
   ctx.fillStyle = F.nose
   ctx.beginPath(); ctx.moveTo(mx - 1.6, 3.2); ctx.lineTo(mx + 1.6, 3.2); ctx.lineTo(mx, 5); ctx.closePath(); ctx.fill()
   if (p.mouth > 0.05) {
-    ctx.fillStyle = '#5b1f1c'; ellipse(ctx, mx, 7.4 + p.mouth * 1.4, 2.4 + p.mouth * 0.6, 0.6 + p.mouth * 3)
+    ctx.fillStyle = F.mouth || '#5b1f1c'; ellipse(ctx, mx, 7.4 + p.mouth * 1.4, 2.4 + p.mouth * 0.6, 0.6 + p.mouth * 3)
     ctx.fillStyle = '#d9737a'; ellipse(ctx, mx, 8.2 + p.mouth * 2.6, 1.6, 0.4 + p.mouth * 1.2)
     ctx.fillStyle = '#fbf6ee'
     for (const sg of [-1, 1]) { ctx.beginPath(); ctx.moveTo(mx + sg * 1.9, 6.9); ctx.lineTo(mx + sg * 1.5, 7.9 + p.mouth); ctx.lineTo(mx + sg * 1.1, 6.9); ctx.fill() }
@@ -251,6 +265,7 @@ export function drawCat(ctx, s) {
   const P = (a, b) => [hip[0] + u[0] * a + n[0] * b, hip[1] + u[1] * a + n[1] * b]
 
   // floor shadow: a soft pool under the body
+  if (!F.flat) {
   const sx0 = Math.min(hip[0], sh[0]) - 16, sx1 = Math.max(hip[0], sh[0]) + 18
   const cx = (sx0 + sx1) / 2 + 3, rx = (sx1 - sx0) / 2 + 6
   ctx.save()
@@ -259,6 +274,7 @@ export function drawCat(ctx, s) {
   sg.addColorStop(0, s.dark ? 'rgba(0,0,0,0.55)' : 'rgba(70,40,15,0.24)'); sg.addColorStop(1, 'rgba(0,0,0,0)')
   ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(0, 0, rx, 0, Math.PI * 2); ctx.fill()
   ctx.restore()
+  }
 
   // tail chain; it lies along the floor instead of going through it
   const back = Math.atan2(-u[1], -u[0])
@@ -353,7 +369,7 @@ export function drawCat(ctx, s) {
   ctx.fillStyle = F.light
   capsule(ctx, P(L + 6, -6), [hc[0] + 1, hc[1] + 5], 8, 7)
 
-  const face = s.face || 0
+  const face = F.flat ? ((s.face || 0) > 0.5 ? 1 : 0) : s.face || 0
   ctx.save()
   ctx.translate(hc[0], hc[1])
   ctx.rotate(p.tilt + (s.headTilt || 0))

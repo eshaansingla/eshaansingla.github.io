@@ -17,13 +17,37 @@ const proj = (r) => r.map(([lo, la]) => ll(lo, la))
 const INDIA = GEO.india.map(proj)
 const STATES = GEO.states.map((st) => ({ n: st.n, r: st.r.map(proj), c: ll(...st.c), a: st.a }))
 const PUNJAB = STATES.find((st) => st.n === 'Punjab').r
-// rings that wrap the date line are cut there so they never draw a line across the whole world
+// rings that cross the date line (Russia's far east, Fiji) are unwrapped so they stay one closed shape,
+// running on past 180° instead of being cut, which used to close Russia's north coast with a straight line
 const cutAtDateLine = (r) => {
-  const out = [[]]
-  r.forEach(([lo, la], i) => { if (i && Math.abs(lo - r[i - 1][0]) > 180) out.push([]); out[out.length - 1].push([lo, la]) })
-  return out.filter((q) => q.length > 2)
+  let off = 0
+  const out = r.map(([lo, la], i) => {
+    if (i) { const prev = r[i - 1][0]; if (lo - prev > 180) off -= 360; else if (prev - lo > 180) off += 360 }
+    return [lo + off, la]
+  })
+  // keep most of the shape inside -180..180
+  const mean = out.reduce((a, p) => a + p[0], 0) / out.length
+  const shift = mean > 180 ? -360 : mean < -180 ? 360 : 0
+  return [shift ? out.map(([lo, la]) => [lo + shift, la]) : out]
 }
 const COUNTRIES = GEO.countries.filter((c) => c.n !== 'Antarctica').map((c) => ({ n: c.n, r: c.r.flatMap(cutAtDateLine).map(proj), c: ll(...c.c), a: c.a }))
+const COUNTRY_ORDER = [...COUNTRIES].sort((a, b) => b.a - a.a)
+const SHORT = { 'United States of America': 'United States', 'Dem. Rep. Congo': 'DR Congo', 'Central African Rep.': 'C. African Rep.', 'Bosnia and Herz.': 'Bosnia', 'Dominican Rep.': 'Dominican Rep.' }
+// every land ring with its bounding box, for culling at close zoom and for telling land from sea
+const boxOf = (r) => { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; r.forEach(([x, y]) => { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y }); return { r, x0, y0, x1, y1 } }
+const LAND = [...COUNTRIES.flatMap((c) => c.r), ...INDIA].map(boxOf)
+const BOX = new Map(LAND.map((b) => [b.r, b]))
+const meets = (b, v, pad = 0) => b.x1 >= v.x0 - pad && b.x0 <= v.x1 + pad && b.y1 >= v.y0 - pad && b.y0 <= v.y1 + pad
+const inRing = (r, x, y) => { let inside = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const [xi, yi] = r[i], [xj, yj] = r[j]; if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside } return inside }
+export const onLand = (x, y) => LAND.some((b) => x >= b.x0 && x <= b.x1 && y >= b.y0 && y <= b.y1 && inRing(b.r, x, y))
+/** Sea, then every coastline in the land colour: the base under streets at city zoom, so the sea stays sea. */
+export function drawLand(ctx, dark, view) {
+  const P = dark ? PALETTE.dark : PALETTE.light
+  ctx.fillStyle = P.water
+  ctx.fillRect(view.x0 - 10, view.y0 - 10, view.x1 - view.x0 + 20, view.y1 - view.y0 + 20)
+  ctx.fillStyle = P.land
+  LAND.forEach((b) => { if (!meets(b, view)) return; ctx.beginPath(); b.r.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.fill() })
+}
 // pan limits: the whole world; INDIA_BOX frames the country for the "IN" button
 export const WORLD = (() => { const [x0, y0] = ll(-180, 78), [x1, y1] = ll(180, -56); return { x0, x1, y0, y1 } })()
 export const INDIA_BOX = (() => {
@@ -428,20 +452,32 @@ export function drawGeo(ctx, dark, k, signal, view) {
   ctx.fillRect(view.x0 - 1e6, view.y0 - 1e6, view.x1 - view.x0 + 2e6, view.y1 - view.y0 + 2e6)
   const other = dark ? '#262628' : '#e4ded3', edge = dark ? '#3a3a3e' : '#c4bcae'
   ctx.lineWidth = 0.8 / k
-  COUNTRIES.forEach((c) => c.r.forEach((r) => { ring(r); ctx.fillStyle = other; ctx.fill(); ctx.strokeStyle = edge; ctx.stroke() }))
+  const vis = (r) => { const b = BOX.get(r); return !b || meets(b, view) }
+  COUNTRIES.forEach((c) => c.r.forEach((r) => { if (!vis(r)) return; ring(r); ctx.fillStyle = other; ctx.fill(); ctx.strokeStyle = edge; ctx.stroke() }))
   INDIA.forEach((r) => { ring(r); ctx.fillStyle = P.land; ctx.fill() })
-  // states and union territories
-  ctx.strokeStyle = dark ? '#4d4842' : '#c9bfae'
-  ctx.lineWidth = 0.7 / k
-  STATES.forEach((st) => st.r.forEach((r) => { ring(r); if (st.n === 'Punjab') { ctx.fillStyle = signal + '1f'; ctx.fill() } ctx.stroke() }))
-  INDIA.forEach((r) => { ring(r); ctx.strokeStyle = dark ? '#7a736b' : '#8f8676'; ctx.lineWidth = 1.3 / k; ctx.stroke() })
-  PUNJAB.forEach((r) => { ring(r); ctx.strokeStyle = signal; ctx.lineWidth = 1.4 / k; ctx.stroke() })
+  // states and union territories, once India is big enough for them to read as states rather than noise
+  if (k >= 0.0005) {
+    ctx.strokeStyle = dark ? '#4d4842' : '#c9bfae'
+    ctx.lineWidth = 0.7 / k
+    STATES.forEach((st) => st.r.forEach((r) => { ring(r); if (st.n === 'Punjab') { ctx.fillStyle = signal + '1f'; ctx.fill() } ctx.stroke() }))
+  }
+  // India's border reads like any other country's from far out, and firmer as you come in
+  INDIA.forEach((r) => { ring(r); ctx.strokeStyle = k < 0.0005 ? edge : dark ? '#7a736b' : '#8f8676'; ctx.lineWidth = (k < 0.0005 ? 0.9 : 1.3) / k; ctx.stroke() })
+  if (k >= 0.0005) PUNJAB.forEach((r) => { ring(r); ctx.strokeStyle = signal; ctx.lineWidth = 1.4 / k; ctx.stroke() })
 
   const T = (text, x, y, px, o) => screenText(ctx, text, x, y, px, o)
   // country names once they are big enough on screen
   const cName = dark ? '#7d776f' : '#8c8476'
-  COUNTRIES.forEach((c) => { if (px(c.a) > 70 && onScreen(c.c)) T(c.n.toUpperCase(), c.c[0], c.c[1], 9.5, { weight: 600, color: cName }) })
-  if (k < 0.0014) T('INDIA', ...ll(78.6, 20.4), 11, { weight: 700, color: signal })
+  // largest first, and a name is skipped where it would overlap one already placed
+  const placed = [], sc = k * view.sx
+  const room = (x, y, w, h) => { const q = [x - w / 2, y - h / 2, x + w / 2, y + h / 2]; if (placed.some((o) => q[0] < o[2] && q[2] > o[0] && q[1] < o[3] && q[3] > o[1])) return false; placed.push(q); return true }
+  if (k < 0.0014) { const [ix, iy] = ll(78.6, 20.4); room((ix - view.x0) * sc, (iy - view.y0) * sc, 46, 16); T('INDIA', ix, iy, 11, { weight: 700, color: signal }) }
+  COUNTRY_ORDER.forEach((c) => {
+    const name = SHORT[c.n] || c.n
+    if (c.n === 'India' || px(c.a) < 26 || !onScreen(c.c)) return
+    if (!room((c.c[0] - view.x0) * sc, (c.c[1] - view.y0) * sc, name.length * 6.6 + 8, 14)) return
+    T(name.toUpperCase(), c.c[0], c.c[1], 9.5, { weight: 600, color: cName })
+  })
   // state and territory names when the state is big enough on screen
   STATES.forEach((st) => { if (st.n !== 'Punjab' && px(st.a) > 60 && onScreen(st.c)) T(st.n.toUpperCase(), st.c[0], st.c[1], 8.5, { weight: 600, color: P.area }) })
   if (k >= 0.0009) T('PUNJAB', ...ll(75.4, 31.05), 10, { weight: 700, color: signal })
@@ -560,8 +596,9 @@ export const CITIES = [
 ]
 const plans = new Map()
 export function planFor(c) {
-  if (plans.has(c.n)) return plans.get(c.n)
-  const rnd = mulberry(hashStr(c.n))
+  if (c.town ? c.L : plans.has(c.n)) return c.town ? c.L : plans.get(c.n)
+  const id = c.key || c.n
+  const rnd = mulberry(hashStr(id))
   const R = c.R, gap = 68 + rnd() * 34, rot = (rnd() - 0.5) * 0.55
   const lines = []
   for (let v = -R; v <= R; v += gap) lines.push(Math.round(v))
@@ -570,22 +607,168 @@ export function planFor(c) {
   const phase = rnd() * 6
   const edge = (a) => R * (0.82 + 0.18 * Math.sin(a * 3 + phase)) // an irregular city edge
   const inside = (x, y) => Math.hypot(x, y) < edge(Math.atan2(y, x))
-  const sig = SIGNATURE[c.n] || ['monument', `${c.n} Town Hall`]
+  const sig = c.town ? ['monument', ''] : SIGNATURE[c.n] || ['monument', `${c.n} Town Hall`]
   const river = sig[0] === 'bridge' || sig[0] === 'lake' || rnd() < 0.45 ? { y0: (rnd() - 0.5) * R * 0.6, amp: 30 + rnd() * 50, f: 180 + rnd() * 200 } : null
   const ry = (x) => river.y0 + river.amp * Math.sin(x / river.f)
   const pois = []
-  ;['hospital', 'school', 'police', 'hospital'].forEach((kind) => {
+  ;(c.village ? ['school'] : ['hospital', 'school', 'police', 'hospital']).forEach((kind) => {
     const a = rnd() * Math.PI * 2, d = R * (0.25 + rnd() * 0.45)
     pois.push({ kind, x: Math.cos(a) * d, y: Math.sin(a) * d, name: kind === 'hospital' ? 'Hospital' : kind === 'school' ? 'School' : 'Police' })
   })
-  const station = { x: lines[Math.floor(lines.length * 0.5)] + gap / 2, y: R * 0.55 }
-  const cars = Array.from({ length: BIG.has(c.n) ? 70 : 40 }, () => {
+  const station = c.village ? null : { x: lines[Math.floor(lines.length * 0.5)] + gap / 2, y: R * 0.55 }
+  const cars = Array.from({ length: BIG.has(c.n) ? 70 : c.village ? 8 : c.town ? 22 : 40 }, () => {
     const row = rnd() < 0.5
     return { row, line: lines[Math.floor(rnd() * lines.length)], dir: rnd() < 0.5 ? 1 : -1, v: 14 + rnd() * 18, ph: rnd() * 4000, col: ['#c8433a', '#2f5d9e', '#e8e4da', '#3b3b40', '#d8a32e', '#5f8f62'][Math.floor(rnd() * 6)] }
   })
-  const plan = { R, gap, rot, lines, artRows, artCols, inside, river, ry, pois, station, cars, sig, phase, seed: hashStr(c.n) }
-  plans.set(c.n, plan)
+  const plan = { R, gap, rot, lines, artRows, artCols, inside, river, ry, pois, station, cars, sig, phase, seed: hashStr(id) }
+  if (c.town) c.L = plan // towns come and go with the view, so their plans travel with them
+  else plans.set(c.n, plan)
   return plan
+}
+
+// ── Towns: anywhere on land, one small town in most 7.5 km squares, so a close zoom always finds work going on.
+// Each is placed and named deterministically from its square, so the same place always looks the same.
+export const TOWN_CELL = 1500
+export const VILLAGE_CELL = 600
+const towns = new Map(), villages = new Map()
+const COMPASS = ['E', 'SE', 'S', 'SW', 'W', 'NW', 'N', 'NE']
+// where a place is, said the way people give directions: distance and bearing from the nearest city
+function directions(x, y) {
+  let near = { n: 'Patiala', x: MW / 2, y: MH / 2 }, nd = Math.hypot(x - near.x, y - near.y)
+  for (const c of CITIES) { const d = Math.hypot(c.x - x, c.y - y); if (d < nd) { nd = d; near = c } }
+  const dir = COMPASS[(Math.round(Math.atan2(y - near.y, x - near.x) / (Math.PI / 4)) + 8) % 8]
+  const km = (nd * M_PER_UNIT) / 1000
+  return `${km < 100 ? km.toFixed(1) : Math.round(km).toLocaleString('en-IN')} km ${dir} of ${near.n}`
+}
+const clearOfCities = (x, y, R) => !(x > -700 && x < MW + 700 && y > -700 && y < MH + 700) && CITIES.every((c) => Math.hypot(c.x - x, c.y - y) > c.R + R + 200)
+function makeTown(i, j) {
+  const rnd = mulberry(hashStr(`town ${i},${j}`))
+  if (rnd() > 0.9) return null
+  const R = 260 + rnd() * 300
+  const x = (i + 0.5) * TOWN_CELL + (rnd() - 0.5) * (TOWN_CELL - 2 * R - 120)
+  const y = (j + 0.5) * TOWN_CELL + (rnd() - 0.5) * (TOWN_CELL - 2 * R - 120)
+  if (!clearOfCities(x, y, R) || !onLand(x, y)) return null
+  return { n: directions(x, y), key: `town ${i},${j}`, x, y, R, town: true, india: false }
+}
+const townAt = (i, j) => { const key = `${i},${j}`; if (!towns.has(key)) towns.set(key, makeTown(i, j)); return towns.get(key) }
+function makeVillage(i, j) {
+  const rnd = mulberry(hashStr(`village ${i},${j}`))
+  if (rnd() > 0.8) return null
+  const R = 110 + rnd() * 100
+  const x = (i + 0.5) * VILLAGE_CELL + (rnd() - 0.5) * (VILLAGE_CELL - 2 * R - 60)
+  const y = (j + 0.5) * VILLAGE_CELL + (rnd() - 0.5) * (VILLAGE_CELL - 2 * R - 60)
+  // clear of any town nearby
+  const ti = Math.floor(x / TOWN_CELL), tj = Math.floor(y / TOWN_CELL)
+  for (let a = ti - 1; a <= ti + 1; a++) for (let b = tj - 1; b <= tj + 1; b++) { const t = townAt(a, b); if (t && Math.hypot(t.x - x, t.y - y) < t.R + R + 90) return null }
+  if (!clearOfCities(x, y, R) || !onLand(x, y)) return null
+  return { n: directions(x, y), key: `village ${i},${j}`, x, y, R, town: true, village: true, india: false }
+}
+function placesIn(view, pad, cell, get) {
+  const out = []
+  const i0 = Math.floor((view.x0 - pad) / cell), i1 = Math.floor((view.x1 + pad) / cell)
+  const j0 = Math.floor((view.y0 - pad) / cell), j1 = Math.floor((view.y1 + pad) / cell)
+  if ((i1 - i0 + 1) * (j1 - j0 + 1) > 400) return out
+  for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const t = get(i, j); if (t) out.push(t) }
+  return out
+}
+export const villagesIn = (view, pad = 0) => {
+  const out = placesIn(view, pad, VILLAGE_CELL, (i, j) => { const key = `${i},${j}`; if (!villages.has(key)) villages.set(key, makeVillage(i, j)); return villages.get(key) })
+  if (villages.size > 12000) [...villages.keys()].slice(0, 5000).forEach((q) => villages.delete(q))
+  return out
+}
+/** The towns whose squares touch the view (plus a margin), created the first time they are needed. */
+export function townsIn(view, pad = 0) {
+  const out = placesIn(view, pad, TOWN_CELL, townAt)
+  if (towns.size > 8000) [...towns.keys()].slice(0, 3000).forEach((q) => towns.delete(q))
+  return out
+}
+
+// ── The countryside between places: fields, a grid of country roads with traffic, and ships on open water.
+const seaCells = new Map()
+const openSea = (i, j) => {
+  const key = `${i},${j}`
+  if (!seaCells.has(key)) { const C = TOWN_CELL, x = i * C, y = j * C; seaCells.set(key, ![[0.5, 0.5], [0, 0], [1, 0], [0, 1], [1, 1], [0.5, 0], [0, 0.5], [1, 0.5], [0.5, 1]].some(([a, b]) => onLand(x + a * C, y + b * C))) }
+  return seaCells.get(key)
+}
+// rough boxes (lon, lon, lat, lat) for the world's big dry regions
+const DESERTS = [[-17, 33, 15, 31], [34, 60, 14, 31], [69, 73.5, 24, 29.5], [52, 66, 27, 34], [118, 145, -30, -20], [94, 115, 38, 46], [-117, -105, 30, 37], [14, 25, -28, -18], [-71, -68, -27, -18], [55, 64, 37, 45]]
+export function drawCountryside(ctx, dark, k, t, view) {
+  const P = dark ? PALETTE.dark : PALETTE.light
+  // ships, one in each square of open water
+  if (k >= 0.05) {
+    const i0 = Math.floor(view.x0 / TOWN_CELL), i1 = Math.floor(view.x1 / TOWN_CELL), j0 = Math.floor(view.y0 / TOWN_CELL), j1 = Math.floor(view.y1 / TOWN_CELL)
+    if ((i1 - i0 + 1) * (j1 - j0 + 1) <= 120) for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+      if (!openSea(i, j)) continue
+      const rnd = mulberry(hashStr(`ship ${i},${j}`)), a = rnd() * Math.PI * 2, v = 6 + rnd() * 6, ph = rnd() * 2000
+      const u = ((ph + t * v) % (TOWN_CELL * 0.8)) - TOWN_CELL * 0.4
+      const x = (i + 0.5) * TOWN_CELL + Math.cos(a) * u, y = (j + 0.5) * TOWN_CELL + Math.sin(a) * u
+      ctx.save(); ctx.translate(x, y); ctx.rotate(a)
+      const s = Math.max(1, 3 / Math.sqrt(k))
+      ctx.strokeStyle = dark ? 'rgba(200,220,230,0.25)' : 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1.2 * s
+      ctx.beginPath(); ctx.moveTo(-6 * s, -2 * s); ctx.lineTo(-26 * s, -7 * s); ctx.moveTo(-6 * s, 2 * s); ctx.lineTo(-26 * s, 7 * s); ctx.stroke()
+      ctx.fillStyle = dark ? '#8a8f96' : '#5d6670'
+      ctx.beginPath(); ctx.moveTo(8 * s, 0); ctx.lineTo(3 * s, -2.6 * s); ctx.lineTo(-7 * s, -2.6 * s); ctx.lineTo(-7 * s, 2.6 * s); ctx.lineTo(3 * s, 2.6 * s); ctx.closePath(); ctx.fill()
+      ctx.fillStyle = ['#c8433a', '#2f5d9e', '#d8a32e'][Math.floor(rnd() * 3)]; ctx.fillRect(-4 * s, -1.6 * s, 4 * s, 3.2 * s)
+      ctx.restore()
+    }
+  }
+  if (k < 0.25) return
+  // fields and country roads only on land: clip to the coastlines on screen
+  ctx.save()
+  ctx.beginPath()
+  LAND.forEach((b) => { if (!meets(b, view)) return; b.r.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath() })
+  ctx.clip('nonzero')
+  const F = VILLAGE_CELL / 2
+  const fi0 = Math.floor(view.x0 / F), fi1 = Math.floor(view.x1 / F), fj0 = Math.floor(view.y0 / F), fj1 = Math.floor(view.y1 / F)
+  // the ground follows the latitude: crops in the temperate belts, sand in the dry subtropics, forest in the far north and the tropics
+  const BIOME = {
+    crops: dark ? ['#1f2419', '#24231b', '#1c211d', '#22261c'] : ['#e3e6cf', '#ece3c7', '#dfe8d2', '#e8e0c4'],
+    sand: dark ? ['#262219', '#29241a', '#24201a', '#2a2519'] : ['#f0e3c4', '#ecdcb8', '#f3e8cc', '#e9d8b0'],
+    forest: dark ? ['#18211a', '#1a2419', '#162019', '#1b231b'] : ['#cfe0c4', '#c6dbbb', '#d4e3c8', '#c2d6b6'],
+  }
+  const lo = LON0 + ((view.x0 + view.x1) / 2 - MW / 2) / UX, la = LAT0 - ((view.y0 + view.y1) / 2 - MH / 2) / UY
+  const crops = DESERTS.some(([a, b, c, d]) => lo >= a && lo <= b && la >= c && la <= d) ? BIOME.sand : Math.abs(la) > 55 || Math.abs(la) < 9 ? BIOME.forest : BIOME.crops
+  if ((fi1 - fi0 + 1) * (fj1 - fj0 + 1) <= 600) for (let i = fi0; i <= fi1; i++) for (let j = fj0; j <= fj1; j++) {
+    const x = i * F, y = j * F
+    if (x > -700 && x < MW + 700 && y > -700 && y < MH + 700) continue // Patiala's own map
+    const h = hashStr(`field ${i},${j}`)
+    ctx.fillStyle = crops[h % 4]
+    ctx.fillRect(x + 6, y + 6, F - 12, F - 12)
+    // a tractor working some of the fields, up one furrow and back down the next
+    if (k >= 0.5 && h % 3 !== 1) {
+      const span = F - 40, lap = (t * (5 + (h % 5)) + (h % 977)) % (span * 2 * 6), row = Math.floor(lap / (span * 2)) , u = lap % (span * 2)
+      const fwd = u < span, tx = x + 20 + (fwd ? u : span * 2 - u), ty = y + 22 + (row % 6) * ((F - 44) / 5)
+      ctx.fillStyle = dark ? 'rgba(255,255,255,0.05)' : 'rgba(120,100,60,0.18)'
+      ctx.fillRect(fwd ? x + 20 : tx, ty - 1.6, fwd ? tx - x - 20 : x + 20 + span - tx, 3.2)
+      ctx.fillStyle = ['#c8433a', '#3f7d3a', '#2f5d9e'][h % 3]
+      ctx.beginPath(); ctx.roundRect(tx - 3, ty - 2, 6, 4, 1); ctx.fill()
+      ctx.fillStyle = dark ? '#111' : '#333'; ctx.fillRect(tx + (fwd ? -3.6 : 2.2), ty - 2.6, 1.4, 5.2)
+    }
+    if (k >= 0.6 && h % 3 === 0) { ctx.strokeStyle = dark ? 'rgba(255,255,255,0.04)' : 'rgba(120,110,80,0.12)'; ctx.lineWidth = 1; for (let q = 14; q < F - 12; q += 9) { ctx.beginPath(); ctx.moveTo(x + 8, y + q); ctx.lineTo(x + F - 8, y + q); ctx.stroke() } }
+  }
+  // country roads along the village squares, each with a little traffic
+  const R0 = Math.floor(view.x0 / VILLAGE_CELL), R1 = Math.floor(view.x1 / VILLAGE_CELL) + 1, C0 = Math.floor(view.y0 / VILLAGE_CELL), C1 = Math.floor(view.y1 / VILLAGE_CELL) + 1
+  if ((R1 - R0) + (C1 - C0) <= 80) {
+    ;[0, 1].forEach((pass) => {
+      ctx.strokeStyle = pass ? P.road : P.casing
+      ctx.lineWidth = pass ? 3.6 : 6
+      for (let i = R0; i <= R1; i++) { const x = i * VILLAGE_CELL; ctx.beginPath(); ctx.moveTo(x, view.y0 - 10); ctx.lineTo(x, view.y1 + 10); ctx.stroke() }
+      for (let j = C0; j <= C1; j++) { const y = j * VILLAGE_CELL; ctx.beginPath(); ctx.moveTo(view.x0 - 10, y); ctx.lineTo(view.x1 + 10, y); ctx.stroke() }
+    })
+    const car = (x, y, row, col) => { ctx.fillStyle = col; ctx.beginPath(); if (row) ctx.roundRect(x - 2.4, y - 1.2, 4.8, 2.4, 0.8); else ctx.roundRect(x - 1.2, y - 2.4, 2.4, 4.8, 0.8); ctx.fill() }
+    const cols = ['#c8433a', '#2f5d9e', '#e8e4da', '#3b3b40', '#d8a32e', '#5f8f62']
+    for (let i = R0; i <= R1; i++) for (let n = 0; n < 3; n++) {
+      const h = hashStr(`col ${i} ${n}`), dir = h % 2 ? 1 : -1, y = (((h % 100000) + t * (12 + (h % 9)) * dir) % (VILLAGE_CELL * 40) + VILLAGE_CELL * 40) % (VILLAGE_CELL * 40)
+      const yy = Math.floor(view.y0 / (VILLAGE_CELL * 40)) * VILLAGE_CELL * 40 + y
+      car(i * VILLAGE_CELL + dir * 1.1, yy, false, cols[h % 6])
+    }
+    for (let j = C0; j <= C1; j++) for (let n = 0; n < 3; n++) {
+      const h = hashStr(`row ${j} ${n}`), dir = h % 2 ? 1 : -1, x = (((h % 100000) + t * (12 + (h % 9)) * dir) % (VILLAGE_CELL * 40) + VILLAGE_CELL * 40) % (VILLAGE_CELL * 40)
+      const xx = Math.floor(view.x0 / (VILLAGE_CELL * 40)) * VILLAGE_CELL * 40 + x
+      car(xx, j * VILLAGE_CELL - dir * 1.1, true, cols[h % 6])
+    }
+  }
+  ctx.restore()
 }
 /** Buildings and parks for a city, built the first time it is drawn close up. */
 function detailFor(L) {
@@ -616,9 +799,9 @@ function detailFor(L) {
   return L
 }
 /** Draw every city whose plan is on screen. Patiala has its own hand-made map and is skipped. */
-export function drawCities(ctx, dark, k, t, view) {
+export function drawCities(ctx, dark, k, t, view, list = CITIES) {
   const P = dark ? PALETTE.dark : PALETTE.light
-  CITIES.forEach((c) => {
+  list.forEach((c) => {
     if (c.x + c.R < view.x0 || c.x - c.R > view.x1 || c.y + c.R < view.y0 || c.y - c.R > view.y1) return
     const L = planFor(c), R = L.R
     if (k >= 0.12) detailFor(L)
@@ -671,13 +854,17 @@ export function drawCities(ctx, dark, k, t, view) {
       ctx.lineWidth = 12 - (pass ? 2.4 : 0)
       ctx.beginPath(); ctx.arc(0, 0, R * 0.74, 0, 7); ctx.stroke()
     })
-    // railway station on its line
-    ctx.strokeStyle = dark ? '#2e2c2a' : '#cfc7b8'; ctx.lineWidth = 6
-    ctx.beginPath(); ctx.moveTo(-R * 1.4, L.station.y + 14); ctx.lineTo(R * 1.4, L.station.y + 14); ctx.stroke()
+    // railway station on its line (villages have none)
+    if (L.station) {
+      ctx.strokeStyle = dark ? '#2e2c2a' : '#cfc7b8'; ctx.lineWidth = 6
+      ctx.beginPath(); ctx.moveTo(-R * 1.4, L.station.y + 14); ctx.lineTo(R * 1.4, L.station.y + 14); ctx.stroke()
+    }
     if (k >= 0.5) {
-      ctx.fillStyle = dark ? '#3b2f2a' : '#d9b48f'; ctx.fillRect(L.station.x - 40, L.station.y + 2, 80, 8)
-      const tx = ((t * 40 + hashStr(c.n) % 997) % (R * 3)) - R * 1.5
-      for (let q = 0; q < 7; q++) { ctx.fillStyle = q ? (dark ? '#5d6b7c' : '#4f6b8a') : '#c8433a'; ctx.beginPath(); ctx.roundRect(tx - q * 15, L.station.y + 11.4, 13.5, 5.2, 1.6); ctx.fill() }
+      if (L.station) {
+        ctx.fillStyle = dark ? '#3b2f2a' : '#d9b48f'; ctx.fillRect(L.station.x - 40, L.station.y + 2, 80, 8)
+        const tx = ((t * 40 + (L.seed % 997)) % (R * 3)) - R * 1.5
+        for (let q = 0; q < 7; q++) { ctx.fillStyle = q ? (dark ? '#5d6b7c' : '#4f6b8a') : '#c8433a'; ctx.beginPath(); ctx.roundRect(tx - q * 15, L.station.y + 11.4, 13.5, 5.2, 1.6); ctx.fill() }
+      }
       // traffic
       L.cars.forEach((car) => {
         const len = 2 * R, s0 = ((car.ph + t * car.v) % len) - R, pos = car.dir > 0 ? s0 : -s0
@@ -694,12 +881,13 @@ export function drawCities(ctx, dark, k, t, view) {
     if (k >= 0.35) {
       L.pois.forEach((p) => drawPoi(ctx, { ...p, name: p.name }, dark, k))
       const lab = L.sig[0] === 'bridge' ? [0, L.ry(0) + 22] : [0, ['goldtemple', 'palace', 'fort', 'stadium', 'lake', 'pyramid', 'opera', 'gateway'].includes(L.sig[0]) ? 32 : 14]
-      screenText(ctx, L.sig[1], lab[0], lab[1], 9.5, { weight: 600, color: dark ? '#d9d2c5' : '#4a4236', dy: 12 })
-      if (k >= 0.5) screenText(ctx, 'Railway Station', L.station.x, L.station.y, 8.5, { color: P.label, dy: -4 })
+      if (L.sig[1]) screenText(ctx, L.sig[1], lab[0], lab[1], 9.5, { weight: 600, color: dark ? '#d9d2c5' : '#4a4236', dy: 12 })
+      if (k >= 0.5 && L.station) screenText(ctx, 'Railway Station', L.station.x, L.station.y, 8.5, { color: P.label, dy: -4 })
     }
     ctx.restore()
     // the city name sits upright over its plan
-    if (k >= 0.02 && k < 0.6) screenText(ctx, c.n.toUpperCase().split('').join(' '), c.x, c.y - R * 0.86, 11, { weight: 700, color: dark ? '#b8b2a6' : '#6b6458' })
+    if (c.town) { if (k >= (c.village ? 0.25 : 0.06) && k < 0.6) screenText(ctx, c.n, c.x, c.y - R * 0.9, 9.5, { weight: 600, color: dark ? '#9d978b' : '#7a7366' }) }
+    else if (k >= 0.02 && k < 0.6) screenText(ctx, c.n.toUpperCase().split('').join(' '), c.x, c.y - R * 0.86, 11, { weight: 700, color: dark ? '#b8b2a6' : '#6b6458' })
   })
 }
 

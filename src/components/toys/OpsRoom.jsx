@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Device, Panel, Stat, Toggle, Tween } from '../kit'
 import { cssVar, onThemeChange } from '../../theme'
 import { CitySim, KINDS, URG, URG_W, WORK, greedy, solve } from './opsSim'
-import { CITIES, INDIA_BOX, MH, MW, M_PER_UNIT, POIS, WORLD, areaName, cityAt, planFor, drawCities, screenText, drawGeo, drawMap, landColor, mulberry, randomRoadPoint, route, shortest, snap } from './opsMap'
+import { CITIES, INDIA_BOX, MH, MW, M_PER_UNIT, POIS, WORLD, areaName, cityAt, planFor, drawCities, drawLand, drawCountryside, townsIn, villagesIn, onLand, TOWN_CELL, VILLAGE_CELL, screenText, drawGeo, drawMap, landColor, mulberry, randomRoadPoint, route, shortest, snap } from './opsMap'
 
 /*
  * Sanchaalan Saathi figure: the Sanchaalan Saathi operations room, as a live simulation on a street map.
@@ -65,49 +65,97 @@ export default function OpsRoom() {
 
     // every city runs its own operation; reports from all of them land in one store, newest first
     const sims = CITIES.map((c) => { const L = planFor(c); return new CitySim(c, L, mulberry(L.seed ^ 0x5bd1e995)) })
+    // towns: wherever the view goes on land at city zoom, the small towns there start their own operations too
+    const TOWN_K = 0.05
+    const townSims = new Map()
+    let townList = []
+    const all = () => (townList.length ? sims.concat(townList) : sims)
+    const VILLAGE_K = 0.25
+    const updateTowns = (vw, k, now) => {
+      if (k < TOWN_K) { townList = []; return }
+      const places = townsIn(vw, TOWN_CELL * 0.5)
+      if (k >= VILLAGE_K) places.push(...villagesIn(vw, VILLAGE_CELL * 0.5))
+      townList = places.map((c) => {
+        let e = townSims.get(c.key)
+        if (!e) {
+          const L = planFor(c)
+          const sim = new CitySim(c, L, mulberry(L.seed ^ 0x5bd1e995))
+          for (let i = 0; i < 40; i++) sim.step(0.25, emit) // already busy, with a few reports on file, when it comes into view
+          e = { sim, seen: now }
+          townSims.set(c.key, e)
+        }
+        e.seen = now
+        return e.sim
+      })
+      if (townSims.size > 120) {
+        const old = [...townSims.entries()].sort((a, b) => a[1].seen - b[1].seen).slice(0, townSims.size - 90)
+        old.forEach(([key, e]) => {
+          townSims.delete(key)
+          ;(byCity.get(key) || []).forEach((r) => recs.delete(r.key))
+          byCity.delete(key)
+        })
+      }
+    }
     const byCity = new Map(), recent = [], recs = new Map()
-    let dirty = true, focusName = 'Patiala', lastFlush = 0
-    const record = (city, id, base) => {
-      const key = `${city}#${id}`
+    let dirty = true, focusName = 'Patiala', lastFlush = 0, lastStats = -Infinity, lastAdd = 0, shown = []
+    // reports are filed under each place's key (names can repeat; keys cannot)
+    const placeKey = (c) => c.key || c.n
+    const record = (place, city, id, base) => {
+      const key = `${place}#${id}`
       const r = { key, city, id, status: 'extracting', vol: null, ...base }
       recs.set(key, r)
-      recent.unshift(r); if (recent.length > 6) recent.length = 6
-      const list = byCity.get(city) || []
+      // the worldwide feed only takes the named cities, not every town the view happens to pass over
+      if (place === city) { recent.unshift(r); if (recent.length > 6) recent.length = 6 }
+      const list = byCity.get(place) || []
       list.unshift(r); if (list.length > 6) recs.delete(list.pop().key)
-      byCity.set(city, list)
+      byCity.set(place, list)
       dirty = true
     }
-    const patch = (city, id, p) => { const r = recs.get(`${city}#${id}`); if (r) { Object.assign(r, p); dirty = true } }
+    const patch = (place, id, p) => { const r = recs.get(`${place}#${id}`); if (r) { Object.assign(r, p); dirty = true } }
     const emit = (sim, t, p) => {
-      if (!recs.has(`${sim.c.n}#${t.id}`)) {
+      const place = placeKey(sim.c)
+      // a town's long name is already in the feed header, so its reports just say which sector
+      const q = sim.c.town && p.where ? { ...p, where: p.where.replace(`${sim.c.n}, `, '') } : p
+      if (!recs.has(`${place}#${t.id}`)) {
         // an update for an incident that has already scrolled out of the feed: nothing to show
-        if (!p.where) return
-        record(sim.c.n, t.id, { kind: t.kind, urg: t.urg, people: t.people, where: p.where })
+        if (!q.where) return
+        record(place, sim.c.n, t.id, { kind: t.kind, urg: t.urg, people: t.people, where: q.where })
       }
-      patch(sim.c.n, t.id, p)
+      patch(place, t.id, q)
     }
-    const pushFeed = (t) => record('Patiala', t.id, { kind: t.kind, urg: t.urg, people: t.people, where: t.where })
+    const pushFeed = (t) => record('Patiala', 'Patiala', t.id, { kind: t.kind, urg: t.urg, people: t.people, where: t.where })
     const patchFeed = (id, p) => patch('Patiala', id, p)
     const live = (t) => t.state !== 'resolved' && t.state !== 'rejected'
     const sync = () => { dirty = true }
     // the city under the middle of the view, or null for worldwide
+    // the place nearest the middle of the view (any part of it on screen), or null for the worldwide feed
     const focusAt = () => {
       const v = view.current
       if (v.k < FOCUS_K) return null
       const cx = (MW / 2 - v.tx) / v.k, cy = (MH / 2 - v.ty) / v.k
-      if (inPatiala(cx, cy, 300)) return 'Patiala'
+      if (inPatiala(cx, cy, 300)) return { key: 'Patiala', name: 'Patiala' }
+      const reach = Math.hypot(MW, MH) / 2 / v.k
       let best = null, bd = Infinity
-      sims.forEach((s) => { const d = Math.hypot(s.c.x - cx, s.c.y - cy); if (d < s.c.R * 1.6 && d < bd) { bd = d; best = s.c.n } })
-      return best
+      all().forEach((s) => { const d = Math.hypot(s.c.x - cx, s.c.y - cy) - s.c.R; if (d < reach && d < bd) { bd = d; best = s.c } })
+      if (best) return { key: placeKey(best), name: best.village ? `village, ${best.n}` : best.town ? `town, ${best.n}` : best.n }
+      return { key: '', name: onLand(cx, cy) ? 'open country' : 'open sea' }
     }
-    const simOf = (name) => sims.find((s) => s.c.n === name)
-    const simAt = (x, y) => sims.find((s) => Math.hypot(s.c.x - x, s.c.y - y) < s.c.R * 1.15)
+    const simOf = (key) => all().find((s) => placeKey(s.c) === key)
+    const simAt = (x, y) => all().find((s) => Math.hypot(s.c.x - x, s.c.y - y) < s.c.R * 1.15)
+    // The feed moves at reading pace: at most one new card every couple of seconds (the newest waiting one),
+    // while the cards already shown keep updating their status as it changes.
+    const PACE = { city: 1900, world: 2800 }
     const flush = (now) => {
-      const f = focusAt()
-      if (f !== focusName) { focusName = f; dirty = true; setFocus(f) }
-      if (!dirty || now - lastFlush < (f ? 250 : 700)) return
-      dirty = false; lastFlush = now
-      setFeed((f ? byCity.get(f) || [] : recent).map((r) => ({ ...r })))
+      const fo = focusAt(), f = fo ? fo.key : null
+      const src = fo ? byCity.get(f) || [] : recent
+      if (f !== focusName) { focusName = f; setFocus(fo ? fo.name : null); shown = src.slice(0, 6); lastAdd = now; dirty = true }
+      else if (src[0] && !shown.includes(src[0]) && now - lastAdd >= (f ? PACE.city : PACE.world)) { shown = [src[0], ...shown].slice(0, 6); lastAdd = now; dirty = true }
+      if (dirty && now - lastFlush >= 250) {
+        dirty = false; lastFlush = now
+        setFeed(shown.map((r) => ({ ...r })))
+      }
+      if (now - lastStats < 1000) return
+      lastStats = now
       let open = tasks.filter(live).length, res = resolved, rs = respSum, fl = flagged, os = optSum, gs = greedySum, active = open ? 1 : 0
       sims.forEach((s) => { const n = s.open(); open += n; if (n) active++; res += s.stats.resolved; rs += s.stats.respSum; fl += s.stats.flagged; os += s.stats.opt; gs += s.stats.greedy })
       setStats({ open, resolved: res, avg: res ? rs / res : 0, waste: os ? ((gs - os) / os) * 100 : 0, closed: closed.size, flagged: fl, active })
@@ -208,8 +256,9 @@ export default function OpsRoom() {
         if (p) s.add(emit, p, true)
       },
       addVol: () => {
-        const f = focusAt()
+        const f = focusAt()?.key
         if (f && f !== 'Patiala') { simOf(f)?.addVol(); return }
+        if (f === '') return
         if (vols.length >= 8) return
         const s = snap(hub.x, hub.y + 30)
         vols.push({ id: vols.length + 1, x: s.x, y: s.y, pos: s, task: null, path: [], trail: [] })
@@ -247,7 +296,7 @@ export default function OpsRoom() {
       flyTo,
       home: () => flyTo(1, MW / 2, MH / 2),
       detailed: () => view.current.k >= 0.25,
-      focus: () => focusAt(),
+      focus: () => focusAt()?.name,
       linked: (t) => tasks.filter((o) => o !== t && o.state !== 'resolved' && t.kind === 'debris clearing' && o.vol && o.vol.path.length && Math.hypot(o.x - t.x, o.y - t.y) < 260).map((o) => o.id),
     }
 
@@ -320,6 +369,7 @@ export default function OpsRoom() {
       })
       for (let i = tasks.length - 1; i >= 0; i--) if ((tasks[i].state === 'resolved' || tasks[i].state === 'rejected') && simT - tasks[i].t0 > 1.4) tasks.splice(i, 1)
       sims.forEach((s) => s.step(dt, emit))
+      townList.forEach((s) => s.step(dt, emit))
     }
 
     const polyline = (pts) => { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke() }
@@ -335,22 +385,27 @@ export default function OpsRoom() {
       ctx.fillRect(0, 0, W, H)
       ctx.setTransform(dpr * sx * k, 0, 0, dpr * sy * k, dpr * sx * v.tx, dpr * sy * v.ty)
       if (aGeo > 0) drawGeo(ctx, dark, k, C.signal, { x0: -v.tx / k, y0: -v.ty / k, x1: (MW - v.tx) / k, y1: (MH - v.ty) / k, sx })
+      const vw = { x0: -v.tx / k, y0: -v.ty / k, x1: (MW - v.tx) / k, y1: (MH - v.ty) / k }
+      updateTowns(vw, k, t)
       if (aCity > 0) {
         ctx.globalAlpha = aCity
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-        ctx.fillStyle = landColor(dark)
-        ctx.fillRect(0, 0, W, H)
-        ctx.setTransform(dpr * sx * k, 0, 0, dpr * sy * k, dpr * sx * v.tx, dpr * sy * v.ty)
+        drawLand(ctx, dark, vw) // coastlines stay, so the sea is still sea at street level
+        drawCountryside(ctx, dark, k, reduced ? 0 : t, vw)
         drawMap(ctx, dark, closed, k, reduced ? 0 : t)
-        drawCities(ctx, dark, k, reduced ? 0 : t, { x0: -v.tx / k, y0: -v.ty / k, x1: (MW - v.tx) / k, y1: (MH - v.ty) / k })
+        drawCities(ctx, dark, k, reduced ? 0 : t, vw)
+        if (townList.length) {
+          ctx.globalAlpha = aCity * clamp01((k - TOWN_K) / 0.02)
+          drawCities(ctx, dark, k, reduced ? 0 : t, vw, townList.filter((q) => !q.c.village).map((q) => q.c))
+          ctx.globalAlpha = aCity * clamp01((k - VILLAGE_K) / 0.06)
+          drawCities(ctx, dark, k, reduced ? 0 : t, vw, townList.filter((q) => q.c.village).map((q) => q.c))
+        }
         ctx.globalAlpha = 1
       }
-      const vw = { x0: -v.tx / k, y0: -v.ty / k, x1: (MW - v.tx) / k, y1: (MH - v.ty) / k }
       const seen = (s, pad) => s.c.x + pad > vw.x0 && s.c.x - pad < vw.x1 && s.c.y + pad > vw.y0 && s.c.y - pad < vw.y1
       if (k < CLUSTER_K) {
         // far out: every other city's operation shows as a live marker, a ring going out for each new report
         const count = k >= 0.006
-        sims.forEach((s) => {
+        all().forEach((s) => {
           if (!seen(s, 40 / k)) return
           const n = s.open()
           if (!reduced) s.tasks.forEach((tk) => {
@@ -471,8 +526,8 @@ export default function OpsRoom() {
         ctx.fillText(`V${vo.id}`, vo.x, vo.y + 3.3 * u)
       })
       ctx.textAlign = 'left'
-      // every other city on screen, in its own rotated street grid
-      sims.forEach((s) => {
+      // every other city and town on screen, in its own rotated street grid
+      all().forEach((s) => {
         if (!seen(s, s.c.R * 1.2)) return
         ctx.save(); ctx.translate(s.c.x, s.c.y); ctx.rotate(s.L.rot)
         s.draw(ctx, k, reduced ? 0 : t, C, hex, flags.current.showGreedy)
@@ -658,13 +713,13 @@ export default function OpsRoom() {
             <Toggle on={showGreedy} onChange={setShowGreedy} label="Show nearest-first routes" /> nearest-first
           </label>
           <div className="ml-auto flex flex-wrap items-baseline gap-x-5 gap-y-1">
-            <Stat label="cities active"><Tween value={stats.active} /></Stat>
-            <Stat label="open">{stats.open}</Stat>
+            <Stat label="cities active" ch={3}><Tween value={stats.active} /></Stat>
+            <Stat label="open" ch={4}>{stats.open}</Stat>
             <Stat label="roads closed" accent={stats.closed > 0}>{stats.closed}</Stat>
-            <Stat label="fake alerts caught"><Tween value={stats.flagged} /></Stat>
-            <Stat label="resolved"><Tween value={stats.resolved} /></Stat>
-            <Stat label="avg response"><Tween value={stats.avg} format={(v) => `${v.toFixed(1)} s`} /></Stat>
-            <Stat label="nearest-first costs" accent><Tween value={stats.waste} format={(v) => `+${v.toFixed(1)}%`} /></Stat>
+            <Stat label="fake alerts caught" ch={5}><Tween value={stats.flagged} /></Stat>
+            <Stat label="resolved" ch={6}><Tween value={stats.resolved} /></Stat>
+            <Stat label="avg response" ch={6}><Tween value={stats.avg} format={(v) => `${v.toFixed(1)} s`} /></Stat>
+            <Stat label="nearest-first costs" ch={6} accent><Tween value={stats.waste} format={(v) => `+${v.toFixed(1)}%`} /></Stat>
           </div>
         </>
       }
@@ -732,7 +787,12 @@ export default function OpsRoom() {
             <span className="whitespace-nowrap">Field reports</span>
             <span className="truncate normal-case tracking-normal text-ink-2">{focus ?? `all ${CITIES.length + 1} cities`}</span>
           </p>
-          <ul className="max-h-[420px] overflow-hidden md:max-h-none md:flex-1 md:[mask-image:linear-gradient(to_bottom,#000_85%,transparent)]">
+          <ul className="h-[420px] overflow-hidden md:h-auto md:flex-1 md:[mask-image:linear-gradient(to_bottom,#000_85%,transparent)]">
+            {!feed.length && (
+              <li className="px-4 py-5 font-mono text-[11px] leading-relaxed text-mute">
+                {focus === 'open sea' ? 'Nothing reported out at sea. Pan to the coast, or zoom out.' : focus === 'open country' ? 'Fields and country roads. Pan to the nearest village to see its reports.' : 'Quiet for the moment. New reports show up here as they come in.'}
+              </li>
+            )}
             <AnimatePresence initial={false}>
               {feed.map((r) => (
                 <motion.li

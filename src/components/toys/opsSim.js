@@ -73,7 +73,9 @@ export class CitySim {
     this.t = 0
     this.spawnIn = rnd() * 4
     this.stats = { resolved: 0, respSum: 0, flagged: 0, opt: 0, greedy: 0 }
-    const n = city.R > 800 ? 6 : 4
+    // villages run a smaller operation: two volunteers, fewer reports
+    this.small = city.R < 250
+    const n = city.R > 800 ? 6 : this.small ? 2 : 4
     for (let i = 0; i < n; i++) { const p = this.point(); this.vols.push({ id: i + 1, ...p, path: [], task: null }) }
   }
   // a random point on a street inside the city
@@ -152,8 +154,8 @@ export class CitySim {
     this.spawnIn -= dt
     if (this.spawnIn <= 0) {
       const n = r() < 0.4 ? 2 + (r() < 0.4 ? 1 : 0) : 1
-      for (let i = 0; i < n && this.tasks.filter((t) => this.live(t)).length < 8; i++) this.add(emit)
-      this.spawnIn = 2 + r() * 3.5
+      for (let i = 0; i < n && this.tasks.filter((t) => this.live(t)).length < (this.small ? 3 : 8); i++) this.add(emit)
+      this.spawnIn = this.small ? 3.5 + r() * 5 : 2 + r() * 3.5
     }
     let changed = false
     this.tasks.forEach((t) => {

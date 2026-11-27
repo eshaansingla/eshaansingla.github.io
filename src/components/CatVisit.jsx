@@ -146,7 +146,7 @@ export default function CatVisit() {
         p: clonePose(POSES.walk), face: 0, look: [0, 0], open: 1, blinkAt: 2, blinkT: 0, slowBlink: 0,
         swish: 0, swishAt: rnd(3, 6), swishT: 0, twitchAt: rnd(2, 6), twitchT: 0, earBackT: 0,
         mouth: 0, meowT: 0, tiltT: 0, tiltDir: 1, purrT: 0, petT: 0, fx: [], jump: null, lift: 0, roll: 0,
-        tamed: false, misses: 0, counted: false, watchFor: coarse ? rnd(25, 35) : rnd(70, 100), idleAt: rnd(4, 7),
+        tamed: false, misses: 0, counted: false, watchFor: coarse ? rnd(35, 50) : rnd(100, 150), idleAt: rnd(4, 7), friend: tally.tamedAll > 0, greeted: false, meowAt: 0, petTotal: 0,
         pounceAt: 0, glance: null, glanceAt: 0, sleepy: h >= 22 || h < 6, wideT: 0, followUntil: 0, wiggle: false,
       }
       setTally({ present: true, visits: tally.visits + 1 })
@@ -193,6 +193,25 @@ export default function CatVisit() {
       go('hop')
     }
 
+    const meow = (text) => {
+      const c = cat
+      c.meowT = 0.55
+      c.tiltT = 1.3; c.tiltDir = Math.random() < 0.5 ? -1 : 1
+      if (c.t > c.meowAt) { meowSound(rnd(0.92, 1.12)); c.meowAt = c.t + 0.5 }
+      if (text) say(text, 1300)
+    }
+    const tame = (how) => {
+      const c = cat, s = c.state
+      c.tamed = true
+      if (!c.counted) { c.counted = true; setTally({ tamed: tally.tamed + 1, tamedAll: tally.tamedAll + 1 }) }
+      if (!['groom', 'scratch', 'yawn', 'roll', 'hop', 'pounce'].includes(s)) go('tamed')
+      pop('heart', 4, 12)
+      c.slowBlink = 0.01
+      const follow = fine && c.L.mode === 'margin' ? ' She will follow you for a bit.' : ' She trusts you now.'
+      say((how === 'pet' ? 'Purrr. Tamed.' : 'Meow! Tamed.') + follow, 3000)
+      navigator.vibrate?.(20)
+    }
+
     // a click or tap on her: she meows and tilts her head; the first one tames her
     const tap = (dbl) => {
       if (!cat) return
@@ -200,20 +219,9 @@ export default function CatVisit() {
       if (['run', 'startle'].includes(s) || (s === 'walk' && c.then === 'gone')) return
       if (s === 'doze') { go('stretch', { next: 'sit' }); c.wideT = 0.6 }
       if (s === 'hop' || s === 'pounce') { c.lift = 0; go('sit') }
-      c.meowT = 0.55
-      c.tiltT = 1.3; c.tiltDir = Math.random() < 0.5 ? -1 : 1
-      meowSound(rnd(0.92, 1.12))
-      if (!c.tamed) {
-        c.tamed = true
-        if (!c.counted) { c.counted = true; setTally({ tamed: tally.tamed + 1, tamedAll: tally.tamedAll + 1 }) }
-        if (!['groom', 'scratch', 'yawn', 'roll'].includes(s)) go('tamed')
-        pop('heart', 4, 12)
-        c.slowBlink = 0.01
-        say(fine && c.L.mode === 'margin' ? 'Meow! Tamed. She will follow you for a bit.' : 'Meow! Tamed. She trusts you now.', 3000)
-        navigator.vibrate?.(20)
-        return
-      }
-      if (dbl && ['sit', 'tamed'].includes(s)) { c.jump = { from: c.x, to: c.x, t: 0, dur: 0.42, h: 26 * c.L.K, then: 'sit' }; go('hop') }
+      meow()
+      if (!c.tamed) { tame('click'); return }
+      if (dbl && ['sit', 'tamed', 'stroll'].includes(s)) { c.jump = { from: c.x, to: c.x, t: 0, dur: 0.42, h: 26 * c.L.K, then: 'sit' }; go('hop') }
       pop('heart', 2, 10)
       say(pick(MEOWS), 1300)
     }
@@ -250,6 +258,7 @@ export default function CatVisit() {
             if (c.then === 'gone') { finish(); return }
             if (c.then === 'sit' && !c.tamed) faceIn()
             go(c.then)
+            if (c.then === 'sit' && c.friend && !c.greeted) { c.greeted = true; meow('Mrrp! She remembers you.'); c.slowBlink = 0.01 }
           })
           break
         case 'run':
@@ -298,7 +307,7 @@ export default function CatVisit() {
             c.glanceAt = rnd(1.2, 2.6)
           }
           if (c.tamed && c.followUntil && c.t > c.followUntil + 6) { go('doze', { sleepFor: rnd(14, 20), thenLeave: true }); break }
-          if (!c.tamed && c.st > c.watchFor) { go('stretch', { next: 'leave' }); break }
+          if (!c.tamed && c.t > c.watchFor) { go('stretch', { next: 'leave' }); break }
           break
         }
         case 'stroll':
@@ -389,7 +398,7 @@ export default function CatVisit() {
           if (c.st > 2.8) {
             c.mouth = 0
             if (c.leave) walkTo(offscreen(), 'gone', 52)
-            else { faceIn(); go('sit', { watchFor: rnd(25, 35) }) }
+            else { faceIn(); go('sit'); c.watchFor = Math.max(c.watchFor, c.t + rnd(25, 35)) }
           }
           break
         }
@@ -437,7 +446,9 @@ export default function CatVisit() {
       const strokingTouch = touchDown && touchDown.moved > 12 && touchDown.onCat
       if (strokingMouse || strokingTouch) {
         c.petT += dt
-        if (c.purrT <= 0) say('Purrr...', 1600)
+        c.petTotal += dt
+        if (!c.tamed && c.petTotal > 1.2 && !['run', 'startle', 'mock'].includes(c.state)) tame('pet')
+        else if (c.purrT <= 0) say('Purrr...', 1600)
         c.purrT = 0.9
         if (c.petT > 0.55) { c.petT = 0; pop('heart', 1, 8) }
       }
@@ -588,16 +599,28 @@ export default function CatVisit() {
     const onDownAnywhere = (e) => {
       if (!cat || e.target === hb) return
       if (onCat(e.clientX, e.clientY)) { tapNow(); return }
+      if (e.target.closest?.('a, button, input, textarea, select, label, summary, [role], [tabindex], figure, canvas, svg, table, pre, code')) return
       const floor = innerHeight - 4
       const dd = Math.hypot(e.clientX - cat.x, e.clientY - (floor - 25 * cat.L.K))
-      if (dd < 110) { px = e.clientX; py = e.clientY; miss() }
+      if (dd >= 110) return
+      // with a finger, only a real tap counts as a miss, never the start of a scroll
+      if (e.pointerType !== 'mouse') { missCandidate = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), sy: scrollY }; return }
+      px = e.clientX; py = e.clientY; miss()
     }
     const onHit = (e) => {
       e.stopPropagation(); e.preventDefault()
       if (e.pointerType !== 'mouse') touchDown = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, onCat: true }
       tapNow()
     }
-    const onUp = (e) => { if (touchDown && e.pointerId === touchDown.id) touchDown = null }
+    let missCandidate = null
+    const onUp = (e) => {
+      if (touchDown && e.pointerId === touchDown.id) touchDown = null
+      const m = missCandidate
+      if (m && e.pointerId === m.id) {
+        missCandidate = null
+        if (Math.hypot(e.clientX - m.x, e.clientY - m.y) < 10 && performance.now() - m.t < 450 && Math.abs(scrollY - m.sy) < 2) miss()
+      }
+    }
     const decay = setInterval(() => {
       if (performance.now() - lastMove > 150) { pvx = 0; pvy = 0 }
       scrollV *= 0.5
@@ -625,6 +648,24 @@ export default function CatVisit() {
       spawn()
     }, 1000)
     const onCall = () => { if (!cat) spawn() }
+    const onResize = () => {
+      if (!cat) return
+      const L = layout()
+      const was = cat.L
+      if (L.mode !== was.mode || (L.mode === 'margin' && was.mode === 'margin' && (cat.x < 0 || cat.x > innerWidth))) {
+        // her patch of screen is gone: she quietly leaves, and comes back later
+        finish(); return
+      }
+      // same kind of patch: keep her side, and move the bounds
+      if (L.mode === 'margin') {
+        const m = (innerWidth - COL) / 2, K = L.K
+        const x0 = was.side < 0 ? 14 + 40 * K : innerWidth - m + 14 + 40 * K
+        const x1 = was.side < 0 ? m - 14 - 40 * K : innerWidth - 14 - 40 * K
+        cat.L = { ...L, side: was.side, x0: Math.min(x0, x1), x1: Math.max(x0, x1) }
+      } else cat.L = L
+      if (!['walk', 'run'].includes(cat.state)) cat.x = clamp(cat.x, cat.L.x0, cat.L.x1)
+      else cat.goal = clamp(cat.goal, Math.min(cat.L.x0, cat.goal), Math.max(cat.L.x1, cat.goal))
+    }
     // for testing: ?catdebug lets a script put her in a given state
     if (/catdebug/.test(location.search)) window.__cat = { go: (st, x) => cat && go(st, x || {}), get: () => cat }
 
@@ -636,6 +677,7 @@ export default function CatVisit() {
     addEventListener('scroll', onScroll, { passive: true })
     hb.addEventListener('pointerdown', onHit)
     addEventListener('cat:call', onCall)
+    addEventListener('resize', onResize)
     return () => {
       clearInterval(tick); clearInterval(decay); cancelAnimationFrame(raf); clearTimeout(noteTimer); mo.disconnect()
       removeEventListener('pointermove', onMove); removeEventListener('pointerout', onOut)
@@ -644,6 +686,7 @@ export default function CatVisit() {
       removeEventListener('scroll', onScroll)
       hb.removeEventListener('pointerdown', onHit)
       removeEventListener('cat:call', onCall)
+      removeEventListener('resize', onResize)
     }
   }, [])
 

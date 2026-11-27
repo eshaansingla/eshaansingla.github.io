@@ -10,7 +10,7 @@ import MetricRank from './toys/MetricRank'
 import LegalDesk from './toys/LegalDesk'
 import BottleneckToy from './toys/BottleneckToy'
 import RocketLeague from './toys/RocketLeague'
-import { competitive, education, honors, profile, profileLinks, refs, skills } from '../data'
+import { competitive, education, honors, profile, profileLinks, refs, rocketLeague, skills } from '../data'
 
 const RESULTS = [
   ['Pran', 'AUC on 29 untouched test subjects', '0.995', 'chance (0.5)', 'icp'],
@@ -137,6 +137,12 @@ function Correspondence() {
 const code = (n, label = 'code ↗') => (
   <a className="text-signal hover:underline" href={refs[n].href} target="_blank" rel="noreferrer">{label}</a>
 )
+
+const fmt = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+const statsDate = fmt([competitive.leetcode.updated, competitive.codeforces.updated].sort().pop())
+const rlMain = rocketLeague.playlists.find((x) => x.main) ?? rocketLeague.playlists[0]
+const rlWins = rocketLeague.lifetime.find((x) => x.k === 'Wins')?.v ?? 0
+const rlBest = rocketLeague.lifetime.filter((x) => x.top).sort((a, b) => parseFloat(a.top.replace(/\D+/, '')) - parseFloat(b.top.replace(/\D+/, '')))[0]
 
 export default function Paper() {
   const lc = competitive.leetcode
@@ -315,7 +321,7 @@ export default function Paper() {
           ))}
         </dl>
       </Row>
-      <Row className="mt-10" note="From LeetCode and Codeforces, Nov 2026.">
+      <Row className="mt-10" note={`Pulled from LeetCode and Codeforces every hour; last changed ${statsDate}.`}>
         <p className="smallcaps mb-3 text-mute">Competitive programming</p>
         <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2">
           <a href={lc.href} target="_blank" rel="noreferrer" className="group block rounded-xl border border-rule-2 bg-paper p-4 transition-colors hover:border-ink">
@@ -334,7 +340,7 @@ export default function Paper() {
             <p className="mt-1 text-[2.6rem] leading-none">{competitive.codeforces.rating}</p>
             <p className="mt-1 font-mono text-[11px] text-mute">{competitive.codeforces.rank}</p>
             <div className="relative mt-4 h-2 w-full bg-ink/10">
-              <span className="absolute inset-y-0 left-0 bg-ink" style={{ width: `${((competitive.codeforces.rating - 800) / 1200) * 100}%` }} />
+              <span className="absolute inset-y-0 left-0 bg-ink" style={{ width: `${Math.min(100, Math.max(0, ((competitive.codeforces.rating - 800) / 1200) * 100))}%` }} />
             </div>
             <p className="mt-1.5 font-mono text-[11px] text-ink-2">on an 800 to 2000 scale</p>
           </a>
@@ -344,9 +350,9 @@ export default function Paper() {
       {/* ───────────── OFF THE CLOCK ───────────── */}
       <H2 id="off-the-clock" n="B">Off the clock</H2>
       <P>
-        Outside work I play Rocket League, mostly Doubles: <Num>744</Num> ranked 2v2 matches this
-        season, a peak of <Num>680</Num> MMR, and <Num>2,114</Num> lifetime wins. Saves are my
-        best stat, in the top 20% of players tracked on tracker.gg.
+        Outside work I play Rocket League, mostly {rlMain.name}: <Num>{rlMain.matches}</Num> ranked {rlMain.mode} matches this
+        season, a peak of <Num>{rocketLeague.allTimeBest.rating}</Num> MMR, and <Num>{rlWins.toLocaleString('en-IN')}</Num> lifetime wins.
+        {rlBest && <> {rlBest.k} are my best stat, in the {rlBest.top.toLowerCase()} of players tracked on tracker.gg.</>}
       </P>
       <Figure n={9} caption="Snapshot from tracker.gg (Epic, PC). Switch playlists to see each rank and click any lifetime stat for the detail.">
         <RocketLeague />

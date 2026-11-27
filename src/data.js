@@ -1,4 +1,8 @@
 import resumeUrl from './assets/Eshaan_Singla_Resume.pdf'
+import stats from './assets/stats.json'
+import rl from './assets/rl.json'
+
+const LC = stats.leetcode, CF = stats.codeforces
 // Single source of truth for all site content.
 // Sources: résumé (Nov 2026), the project repositories on github.com/eshaansingla, LeetCode, Codeforces and tracker.gg.
 
@@ -29,21 +33,11 @@ export const honors = [
   { title: '500+ DSA problems solved', detail: 'Across LeetCode and Codeforces', year: 'Ongoing' },
 ]
 
+// LeetCode and Codeforces numbers come from src/assets/stats.json, which a scheduled GitHub Action
+// refreshes from both sites every hour (scripts/fetch-stats.mjs)
 export const competitive = {
-  leetcode: {
-    rating: 1541,
-    top: '34.7%',
-    solved: 576,
-    easy: 267,
-    medium: 282,
-    hard: 27,
-    href: 'https://leetcode.com/u/eshaansingla/',
-  },
-  codeforces: {
-    rating: 1268,
-    rank: 'Pupil',
-    href: 'https://codeforces.com/profile/EshaanSingla',
-  },
+  leetcode: { ...stats.leetcode, href: 'https://leetcode.com/u/eshaansingla/' },
+  codeforces: { ...stats.codeforces, href: 'https://codeforces.com/profile/EshaanSingla' },
 }
 
 export const skills = [
@@ -68,8 +62,8 @@ export const skills = [
 export const refs = {
   1: { label: 'GitHub', text: 'github.com/eshaansingla, all public code', href: 'https://github.com/eshaansingla' },
   2: { label: 'LinkedIn', text: 'linkedin.com/in/eshaansingla', href: 'https://www.linkedin.com/in/eshaansingla' },
-  3: { label: 'LeetCode', text: 'Contest rating 1541 (top 34.7%), 576 solved: 267 easy, 282 medium, 27 hard', href: 'https://leetcode.com/u/eshaansingla/' },
-  4: { label: 'Codeforces', text: 'Rating 1268, Pupil', href: 'https://codeforces.com/profile/EshaanSingla' },
+  3: { label: 'LeetCode', text: `Contest rating ${LC.rating} (top ${LC.top}), ${LC.solved} solved: ${LC.easy} easy, ${LC.medium} medium, ${LC.hard} hard`, href: 'https://leetcode.com/u/eshaansingla/' },
+  4: { label: 'Codeforces', text: `Rating ${CF.rating}, ${CF.rank}`, href: 'https://codeforces.com/profile/EshaanSingla' },
   5: { label: 'Pran', text: 'Optical eardrum sensing: firmware, 146-subject study, 14 models, leakage audit', href: 'https://github.com/eshaansingla/Pran' },
   6: { label: 'FIN-X (live)', text: 'finx-pi.vercel.app, real-time NSE intelligence', href: 'https://finx-pi.vercel.app' },
   7: { label: 'FIN-X (code)', text: 'github.com/eshaansingla/finx', href: 'https://github.com/eshaansingla/finx' },
@@ -80,30 +74,7 @@ export const refs = {
   12: { label: 'Parkinson’s Early Prediction', text: 'Voice CNN + tremor DNN fusion (ELC internship)', href: 'https://github.com/eshaansingla/ParkinsonsEarlyPrediction' },
 }
 
-// Rocket League, snapshot from rocketleague.tracker.network (Epic, PC), 27 Nov 2026
-export const rocketLeague = {
-  handle: 'EshaanS_05',
-  platform: 'Epic, PC',
-  season: 'Season 24',
-  rewardLevel: 'Platinum',
-  snapshot: '27 Nov 2026',
-  href: 'https://rocketleague.tracker.network/rocket-league/profile/epic/EshaanS_05/overview',
-  allTimeBest: { rating: 680, playlist: 'Doubles 2v2', season: 'Season 18' },
-  playlists: [
-    { id: '2v2', name: 'Doubles', mode: '2v2', tier: 'Platinum', tierN: 1, div: 1, rating: 655, peak: 655, best: 680, bestSeason: 'S18', matches: 744, streak: 2, nextDiv: 4, main: true },
-    { id: '3v3', name: 'Standard', mode: '3v3', tier: 'Gold', tierN: 1, div: 3, rating: 507, peak: 524, best: 565, bestSeason: 'S14', matches: 10, streak: 2, nextDiv: 10 },
-    { id: '1v1', name: 'Duel', mode: '1v1', tier: 'Gold', tierN: 1, div: 3, rating: 491, peak: 491, best: 638, bestSeason: 'S16', matches: 4, streak: 1 },
-    { id: 'tour', name: 'Tournaments', mode: '3v3', tier: 'Platinum', tierN: 1, div: 3, rating: 680, peak: 680, best: 680, bestSeason: 'S24', matches: 20, streak: 1, nextDiv: 17 },
-    { id: 'hoops', name: 'Hoops', mode: '2v2', tier: 'Gold', tierN: 3, div: 3, rating: 615, matches: 0, streak: 1, top: 'Top 44%' },
-    { id: 'heat', name: 'Heatseeker', mode: '2v2', tier: 'Gold', tierN: 2, div: 1, rating: 518, peak: 580, matches: 24, streak: 2, nextDiv: 1 },
-  ],
-  lifetime: [
-    { k: 'Saves', v: 7066, top: 'Top 20%' },
-    { k: 'MVPs', v: 1146, top: 'Top 30%' },
-    { k: 'Shots', v: 13185, top: 'Top 34%' },
-    { k: 'Wins', v: 2114, top: 'Top 39%' },
-    { k: 'Goals', v: 5792, top: 'Top 40%' },
-    { k: 'Assists', v: 1380 },
-  ],
-  goalShot: 43.9,
-}
+// Rocket League: edit src/assets/rl.json (no public API to pull it from). The snapshot date is the
+// date of the last commit that touched that file, so it stays right without editing it by hand.
+const fmtDate = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+export const rocketLeague = { ...rl, snapshot: fmtDate(__RL_DATE__ || rl.updated) }

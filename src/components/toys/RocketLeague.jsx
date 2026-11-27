@@ -6,6 +6,11 @@ import { rocketLeague as RL } from '../../data'
 // Off-hours: Rocket League snapshot from tracker.gg. Emblems are original drawings, not game art.
 // Original emblem set (not game art): each tier has its own silhouette and metal.
 const TIER = {
+  Bronze: { rim: ['#5a3218', '#c47a45'], face: ['#ffe3cc', '#c98352', '#6e3a18'], ink: '#4a250e', glow: '#e5a274' },
+  Silver: { rim: ['#4b5563', '#d7dde5'], face: ['#ffffff', '#c5ccd6', '#6b7684'], ink: '#2c333d', glow: '#e2e8f0' },
+  Champion: { rim: ['#4c1d95', '#c4a5ff'], face: ['#f5efff', '#a98bf0', '#5b2bb0'], ink: '#2e1065', glow: '#c4a5ff' },
+  'Grand Champion': { rim: ['#7f1d1d', '#ff9a9a'], face: ['#fff0f0', '#f07a7a', '#a32020'], ink: '#4c0d0d', glow: '#ff9a9a' },
+  'Supersonic Legend': { rim: ['#111827', '#e5e7eb'], face: ['#ffffff', '#a5b4fc', '#312e81'], ink: '#111111', glow: '#e0e7ff' },
   Gold: { rim: ['#7a4c0c', '#e2b04d'], face: ['#fff1c4', '#e0aa45', '#8f5c14'], ink: '#5b3906', glow: '#f2c46a' },
   Platinum: { rim: ['#215f70', '#a7e6f2'], face: ['#f4feff', '#9adbe9', '#3d8ea4'], ink: '#0e3f4c', glow: '#9fe3f0' },
   Diamond: { rim: ['#1b2f8c', '#8fb0ff'], face: ['#eef3ff', '#7c9cf5', '#2a45b0'], ink: '#0d1c5e', glow: '#8fb0ff' },
@@ -20,14 +25,23 @@ const SHAPE = {
   Gold: poly(8, 56, Math.PI / 8), // minted coin
   Platinum: 'M0 -58 C 30 -58 50 -50 52 -42 L 52 2 C 52 30 28 48 0 60 C -28 48 -52 30 -52 2 L -52 -42 C -50 -50 -30 -58 0 -58 Z', // shield
   Diamond: poly(12, 56, 0), // faceted medallion
+  Bronze: poly(6, 56, 0),
+  Silver: poly(8, 56, 0),
+  Champion: poly(10, 56, Math.PI / 10),
+  'Grand Champion': poly(14, 56, 0),
+  'Supersonic Legend': poly(16, 56, 0),
 }
+// a tier name the drawings don't know yet falls back to Gold rather than breaking the figure
+const tierOf = (n) => TIER[n] ?? TIER.Gold
+const shapeOf = (n) => SHAPE[n] ?? SHAPE.Gold
 const ROMAN = ['I', 'II', 'III', 'IV']
-const LO = 400, HI = 760
+const RATINGS = RL.playlists.flatMap((x) => [x.rating, x.peak, x.best].filter(Boolean))
+const LO = Math.min(400, Math.floor((Math.min(...RATINGS) - 40) / 20) * 20), HI = Math.max(760, Math.ceil((Math.max(...RATINGS) + 40) / 20) * 20)
 const pos = (v) => ((v - LO) / (HI - LO)) * 100
 
 function Emblem({ p }) {
-  const t = TIER[p.tier]
-  const outer = SHAPE[p.tier]
+  const t = tierOf(p.tier)
+  const outer = shapeOf(p.tier)
   const inner = scale(outer, 0.8)
   const id = `${p.id}-${p.tier}`
   return (
@@ -110,13 +124,25 @@ function Emblem({ p }) {
   )
 }
 
-const DETAIL = {
-  Saves: (v) => ({ rows: [['lifetime', v.toLocaleString('en-IN')], ['percentile', 'top 20%'], ['per win', (v / 2114).toFixed(1)]], text: 'My highest-percentile stat on tracker.gg.' }),
-  MVPs: (v) => ({ rows: [['lifetime', v.toLocaleString('en-IN')], ['percentile', 'top 30%'], ['MVP in', `${Math.round((v / 2114) * 100)}% of wins`]], text: 'MVP in more than half of all wins.' }),
-  Shots: (v) => ({ rows: [['lifetime', v.toLocaleString('en-IN')], ['percentile', 'top 34%'], ['goals from them', '5,792']], text: '13,185 shots on goal across all playlists.' }),
-  Wins: (v) => ({ rows: [['lifetime', v.toLocaleString('en-IN')], ['percentile', 'top 39%'], ['2v2 this season', '744 matches']], text: 'Doubles is the main playlist.' }),
-  Goals: (v) => ({ rows: [['lifetime', v.toLocaleString('en-IN')], ['percentile', 'top 40%'], ['per shot', `${RL.goalShot}%`]], text: 'Close to one goal for every two shots.' }),
-  Assists: (v) => ({ rows: [['lifetime', v.toLocaleString('en-IN')], ['per 10 goals', ((v / 5792) * 10).toFixed(1)]], text: 'Lifetime assists across all playlists.' }),
+// Everything below is worked out from src/assets/rl.json, so updating the numbers there is enough
+const life = Object.fromEntries(RL.lifetime.map((x) => [x.k, x]))
+const val = (k) => life[k]?.v ?? 0
+const MAIN = RL.playlists.find((x) => x.main) ?? RL.playlists[0]
+const GOAL_SHOT = val('Shots') ? +((val('Goals') / val('Shots')) * 100).toFixed(1) : 0
+const BEST = RL.lifetime.filter((x) => x.top).sort((a, b) => parseFloat(a.top.replace(/\D+/, '')) - parseFloat(b.top.replace(/\D+/, '')))[0]?.k
+const per = (a, b, n = 1) => (b ? ((a / b) * n).toFixed(1) : '0')
+const share = (v) => (val('Wins') ? Math.round((v / val('Wins')) * 100) : 0)
+const EXTRA = {
+  Saves: (v) => [['per win', per(v, val('Wins'))], v ? (BEST === 'Saves' ? 'My highest-percentile stat on tracker.gg.' : 'Lifetime saves across all playlists.') : ''],
+  MVPs: (v) => [['MVP in', `${share(v)}% of wins`], `MVP in ${share(v) > 50 ? 'more than half' : `${share(v)}%`} of all wins.`],
+  Shots: (v) => [['goals from them', val('Goals').toLocaleString('en-IN')], `${v.toLocaleString('en-IN')} shots on goal across all playlists.`],
+  Wins: () => [[`${MAIN.mode} this season`, `${MAIN.matches} matches`], `${MAIN.name} is the main playlist.`],
+  Goals: () => [['per shot', `${GOAL_SHOT}%`], GOAL_SHOT >= 40 ? 'Close to one goal for every two shots.' : `About one goal every ${Math.round(100 / (GOAL_SHOT || 1))} shots.`],
+  Assists: (v) => [['per 10 goals', per(v, val('Goals'), 10)], 'Lifetime assists across all playlists.'],
+}
+const detail = (k) => {
+  const v = val(k), [row, text] = EXTRA[k]?.(v) ?? [null, '']
+  return { rows: [['lifetime', v.toLocaleString('en-IN')], ...(life[k]?.top ? [['percentile', life[k].top.toLowerCase()]] : []), ...(row ? [row] : [])], text }
 }
 
 export default function RocketLeague() {
@@ -125,13 +151,13 @@ export default function RocketLeague() {
   const close = useCallback(() => setSel(null), [])
   const [ref, seen] = useSeen('-80px')
   const p = RL.playlists.find((x) => x.id === id)
-  const t = TIER[p.tier]
+  const t = tierOf(p.tier)
   const marks = [
     ['now', p.rating, 'current'],
     p.peak && p.peak !== p.rating ? ['peak', p.peak, 'season peak'] : null,
     p.best && p.best !== p.rating ? ['best', p.best, `all-time best, ${p.bestSeason}`] : null,
   ].filter(Boolean)
-  const d = sel ? DETAIL[sel](RL.lifetime.find((x) => x.k === sel).v) : null
+  const d = sel ? detail(sel) : null
   const ring = 2 * Math.PI * 30
 
   return (
@@ -244,11 +270,11 @@ export default function RocketLeague() {
                   r="30" fill="none" className="stroke-signal" strokeWidth="7" strokeLinecap="round"
                   strokeDasharray={ring}
                   initial={{ strokeDashoffset: ring }}
-                  animate={{ strokeDashoffset: seen ? ring * (1 - RL.goalShot / 100) : ring }}
+                  animate={{ strokeDashoffset: seen ? ring * (1 - GOAL_SHOT / 100) : ring }}
                   transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
                 />
               </svg>
-              <p className="-mt-[62px] mb-[34px] font-mono text-[15px]">{RL.goalShot}%</p>
+              <p className="-mt-[62px] mb-[34px] font-mono text-[15px]">{GOAL_SHOT}%</p>
               <p className="font-mono text-[10px] text-mute">goals per shot</p>
             </div>
           </div>

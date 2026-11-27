@@ -1,26 +1,24 @@
 {
-  "handle": "EshaanS_05",
   "platform": "Epic, PC",
   "season": "Season 24",
-  "rewardLevel": "Platinum",
-  "href": "https://rocketleague.tracker.network/rocket-league/profile/epic/EshaanS_05/overview",
-  "allTimeBest": {"rating": 680, "playlist": "Doubles 2v2", "season": "Season 18"},
+  "rewardLevel": "Diamond",
+  "allTimeBest": {"rating": 982, "playlist": "Doubles 2v2", "season": "Season 24"},
   "playlists": [
-    {"id": "2v2", "name": "Doubles", "mode": "2v2", "tier": "Platinum", "tierN": 1, "div": 1, "rating": 655, "peak": 655, "best": 680, "bestSeason": "S18", "matches": 744, "streak": 2, "nextDiv": 4, "main": true},
-    {"id": "3v3", "name": "Standard", "mode": "3v3", "tier": "Gold", "tierN": 1, "div": 3, "rating": 507, "peak": 524, "best": 565, "bestSeason": "S14", "matches": 10, "streak": 2, "nextDiv": 10},
-    {"id": "1v1", "name": "Duel", "mode": "1v1", "tier": "Gold", "tierN": 1, "div": 3, "rating": 491, "peak": 491, "best": 638, "bestSeason": "S16", "matches": 4, "streak": 1},
+    {"id": "2v2", "name": "Doubles", "mode": "2v2", "tier": "Diamond", "tierN": 2, "div": 3, "rating": 982, "peak": 982, "best": 982, "bestSeason": "S24", "matches": 812, "streak": 4, "nextDiv": 8, "main": true},
+    {"id": "3v3", "name": "Standard", "mode": "3v3", "tier": "Platinum", "tierN": 2, "div": 3, "rating": 734, "peak": 734, "best": 734, "bestSeason": "S24", "matches": 31, "streak": 3, "nextDiv": 9},
+    {"id": "1v1", "name": "Duel", "mode": "1v1", "tier": "Platinum", "tierN": 2, "div": 1, "rating": 668, "peak": 668, "best": 668, "bestSeason": "S24", "matches": 17, "streak": 2, "nextDiv": 13},
     {"id": "tour", "name": "Tournaments", "mode": "3v3", "tier": "Platinum", "tierN": 1, "div": 3, "rating": 680, "peak": 680, "best": 680, "bestSeason": "S24", "matches": 20, "streak": 1, "nextDiv": 17},
-    {"id": "hoops", "name": "Hoops", "mode": "2v2", "tier": "Gold", "tierN": 3, "div": 3, "rating": 615, "matches": 0, "streak": 1, "top": "Top 44%"},
-    {"id": "heat", "name": "Heatseeker", "mode": "2v2", "tier": "Gold", "tierN": 2, "div": 1, "rating": 518, "peak": 580, "matches": 24, "streak": 2, "nextDiv": 1}
+    {"id": "hoops", "name": "Hoops", "mode": "2v2", "tier": "Diamond", "tierN": 1, "div": 2, "rating": 872, "matches": 19, "streak": 3, "top": "Top 21%", "peak": 872, "nextDiv": 11},
+    {"id": "heat", "name": "Heatseeker", "mode": "2v2", "tier": "Diamond", "tierN": 2, "div": 3, "rating": 978, "peak": 978, "matches": 46, "streak": 3, "nextDiv": 15}
   ],
   "lifetime": [
-    {"k": "Saves", "v": 7066, "top": "Top 20%"},
-    {"k": "MVPs", "v": 1146, "top": "Top 30%"},
-    {"k": "Shots", "v": 13185, "top": "Top 34%"},
-    {"k": "Wins", "v": 2114, "top": "Top 39%"},
-    {"k": "Goals", "v": 5792, "top": "Top 40%"},
-    {"k": "Assists", "v": 1380}
+    {"k": "Saves", "v": 7232, "top": "Top 18%"},
+    {"k": "MVPs", "v": 1183, "top": "Top 27%"},
+    {"k": "Shots", "v": 13447, "top": "Top 31%"},
+    {"k": "Wins", "v": 2178, "top": "Top 36%"},
+    {"k": "Goals", "v": 5911, "top": "Top 37%"},
+    {"k": "Assists", "v": 1421}
   ],
-  "goalShot": 43.9,
-  "updated": "2026-11-27"
+  "goalShot": 44.0,
+  "updated": "2026-11-28"
 }

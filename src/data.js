@@ -4,7 +4,7 @@ import rl from './assets/rl.json'
 
 const LC = stats.leetcode, CF = stats.codeforces
 // Single source of truth for all site content.
-// Sources: résumé (Nov 2026), the project repositories on github.com/eshaansingla, LeetCode, Codeforces and tracker.gg.
+// Sources: résumé (Nov 2026), the project repositories on github.com/eshaansingla, LeetCode and Codeforces.
 
 export const profile = {
   name: 'Eshaan Singla',
@@ -18,7 +18,6 @@ export const profileLinks = [
   { label: 'LinkedIn', handle: 'in/eshaansingla', href: 'https://www.linkedin.com/in/eshaansingla' },
   { label: 'LeetCode', handle: 'eshaansingla', href: 'https://leetcode.com/u/eshaansingla/' },
   { label: 'Codeforces', handle: 'EshaanSingla', href: 'https://codeforces.com/profile/EshaanSingla' },
-  { label: 'Rocket League', handle: 'EshaanS_05', href: 'https://rocketleague.tracker.network/rocket-league/profile/epic/EshaanS_05/overview' },
 ]
 
 export const education = [

@@ -372,9 +372,9 @@ export default function Paper() {
       <P>
         Outside work I play Rocket League, mostly {rlMain.name}: <Num>{rlMain.matches}</Num> ranked {rlMain.mode} matches this
         season, a peak of <Num>{rocketLeague.allTimeBest.rating}</Num> MMR, and <Num>{rlWins.toLocaleString('en-IN')}</Num> lifetime wins.
-        {rlBest && <> {rlBest.k} are my best stat, in the {rlBest.top.toLowerCase()} of players tracked on tracker.gg.</>}
+        {rlBest && <> {rlBest.k} are my best stat, in the {rlBest.top.toLowerCase()} of players.</>}
       </P>
-      <Figure n={9} ph={[1180, 680, 525]} caption="Snapshot from tracker.gg (Epic, PC). Switch playlists to see each rank and click any lifetime stat for the detail.">
+      <Figure n={9} ph={[1180, 680, 525]} caption="Snapshot (Epic, PC). Switch playlists to see each rank and click any lifetime stat for the detail.">
         <RocketLeague />
       </Figure>
 

@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Device, Panel, Seg, Tween, useSeen } from '../kit'
 import { rocketLeague as RL } from '../../data'
 
-// Off-hours: Rocket League snapshot from tracker.gg. Emblems are original drawings, not game art.
+// Off-hours: a Rocket League snapshot. Emblems are original drawings, not game art.
 // Original emblem set (not game art): each tier has its own silhouette and metal.
 const TIER = {
   Bronze: { rim: ['#5a3218', '#c47a45'], face: ['#ffe3cc', '#c98352', '#6e3a18'], ink: '#4a250e', glow: '#e5a274' },
@@ -133,7 +133,7 @@ const BEST = RL.lifetime.filter((x) => x.top).sort((a, b) => parseFloat(a.top.re
 const per = (a, b, n = 1) => (b ? ((a / b) * n).toFixed(1) : '0')
 const share = (v) => (val('Wins') ? Math.round((v / val('Wins')) * 100) : 0)
 const EXTRA = {
-  Saves: (v) => [['per win', per(v, val('Wins'))], v ? (BEST === 'Saves' ? 'My highest-percentile stat on tracker.gg.' : 'Lifetime saves across all playlists.') : ''],
+  Saves: (v) => [['per win', per(v, val('Wins'))], v ? (BEST === 'Saves' ? 'My highest-percentile stat.' : 'Lifetime saves across all playlists.') : ''],
   MVPs: (v) => [['MVP in', `${share(v)}% of wins`], `MVP in ${share(v) > 50 ? 'more than half' : `${share(v)}%`} of all wins.`],
   Shots: (v) => [['goals from them', val('Goals').toLocaleString('en-IN')], `${v.toLocaleString('en-IN')} shots on goal across all playlists.`],
   Wins: () => [[`${MAIN.mode} this season`, `${MAIN.matches} matches`], `${MAIN.name} is the main playlist.`],
@@ -162,7 +162,7 @@ export default function RocketLeague() {
 
   return (
     <Device
-      name={`Rocket League, ${RL.handle}`}
+      name="Rocket League"
       sub={`${RL.platform}, ${RL.season}, snapshot ${RL.snapshot}`}
       status="live"
       statusLabel="off-hours"
@@ -178,7 +178,7 @@ export default function RocketLeague() {
       }
       footer={
         <>
-          <a href={RL.href} target="_blank" rel="noreferrer" className="hover:text-signal">source: rocketleague.tracker.network ↗</a>
+          <span>ranked, this season</span>
           <span className="ml-auto">click any lifetime stat</span>
         </>
       }

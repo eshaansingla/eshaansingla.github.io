@@ -94,6 +94,9 @@ export default function Radar() {
   const box = useRef(null)
   const visible = useRef(true)
   const timers = useRef([])
+  const [typing, setTyping] = useState(false)
+  const hold = useRef({ pinned: null, typing: false, auto: false })
+  useEffect(() => { hold.current.pinned = pinned; hold.current.typing = typing }, [pinned, typing])
 
   const selected = deals.find((x) => x.id === pinned) || deals[0]
 
@@ -103,9 +106,15 @@ export default function Radar() {
     io.observe(box.current)
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
     const id = reduced ? null : setInterval(() => {
-      if (!visible.current) return
+      // hold the feed while someone is typing a question, so the deal they are asking about stays put
+      if (!visible.current || hold.current.typing) return
       t0.current = performance.now()
-      setDeals((ds) => [makeDeal(), ...ds].slice(0, 6))
+      setDeals((ds) => {
+        const next = [makeDeal(), ...ds]
+        // a pinned deal never drops off the bottom of the list
+        const keep = hold.current.pinned != null && next.slice(0, 6).every((x) => x.id !== hold.current.pinned)
+        return keep ? [...next.slice(0, 5), next.find((x) => x.id === hold.current.pinned)] : next.slice(0, 6)
+      })
     }, 3400)
     return () => { clearInterval(id); io.disconnect() }
   }, [])
@@ -170,7 +179,7 @@ export default function Radar() {
       footer={
         <>
           <span>feed is simulated; tickers are real NSE symbols, deals are not</span>
-          <span className="ml-auto">{pinned ? 'pinned' : 'following the newest deal'}</span>
+          <span className="ml-auto">{typing ? 'feed held while you type' : pinned ? 'pinned, tap the deal again to follow the feed' : 'following the newest deal'}</span>
         </>
       }
     >
@@ -183,7 +192,7 @@ export default function Radar() {
               return (
                 <motion.li key={dl.id} layout initial={{ opacity: 0, y: -18, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 30 }}>
                   <button
-                    onClick={() => setPinned(dl.id === pinned ? null : dl.id)}
+                    onClick={() => { hold.current.auto = false; setPinned(dl.id === pinned ? null : dl.id) }}
                     className={`relative block w-full border-b border-rule px-4 py-3 text-left transition-colors hover:bg-ink/[0.04] ${on ? 'bg-ink/[0.06]' : ''}`}
                   >
                     {on && <motion.span layoutId="radar-sel" className="absolute inset-y-0 left-0 w-[3px] bg-signal" />}
@@ -258,8 +267,20 @@ export default function Radar() {
             </p>
           </div>
 
-          <form className="mt-4 flex items-center gap-2 rounded-full border border-ink/20 bg-canvas py-1.5 pl-4 pr-1.5 focus-within:border-ink" onSubmit={(e) => { e.preventDefault(); if (q.trim()) ask(selected, q.trim()) }}>
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Ask about ${selected.ticker}…`} className="min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-mute" aria-label="Follow-up question" />
+          <form className="mt-4 flex items-center gap-2 rounded-full border border-ink/20 bg-canvas py-1.5 pl-4 pr-1.5 focus-within:border-ink" onSubmit={(e) => { e.preventDefault(); if (q.trim()) { hold.current.auto = false; ask(selected, q.trim()) } }}>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onFocus={() => {
+                setTyping(true)
+                // pin the deal on screen so the feed can't swap it out mid-question
+                if (pinned == null) { hold.current.auto = true; setPinned(selected.id) }
+              }}
+              onBlur={() => {
+                setTyping(false)
+                // nothing typed: go back to following the newest deal
+                if (hold.current.auto && !q.trim()) { hold.current.auto = false; setPinned(null) }
+              }} placeholder={`Ask about ${selected.ticker}…`} className="min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-mute" aria-label="Follow-up question" />
             <span className="hidden gap-1 sm:flex">
               <AnimatePresence>
                 {hits.slice(0, 2).map((h) => (

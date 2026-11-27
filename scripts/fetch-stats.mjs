@@ -31,7 +31,7 @@ async function leetcode() {
   const n = Object.fromEntries(m.submitStatsGlobal.acSubmissionNum.map((x) => [x.difficulty.toLowerCase(), x.count]))
   return {
     rating: c ? Math.round(c.rating) : old.leetcode.rating,
-    top: c ? `${c.topPercentage}%` : old.leetcode.top,
+    top: c ? `${Math.round(c.topPercentage * 10) / 10}%` : old.leetcode.top,
     contests: c ? c.attendedContestsCount : old.leetcode.contests,
     solved: n.all, easy: n.easy, medium: n.medium, hard: n.hard,
   }

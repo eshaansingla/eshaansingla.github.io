@@ -24,7 +24,7 @@ export const education = [
 ]
 
 export const honors = [
-  { title: 'Merit-1 Scholarship', detail: 'Rank 1 in B.E. CSE, JEE Mains 98.4 percentile', year: '2023–24' },
+  { title: 'Merit-1 Scholarship', detail: 'Rank 1 in B.E. CSE, JEE Main 98.4 percentile', year: '2023–24' },
   { title: 'ELC Summer Research Fellow', detail: 'Competitively selected among top AI/ML candidates', year: '2025' },
   { title: '500+ DSA problems solved', detail: 'Across LeetCode and Codeforces', year: 'Ongoing' },
 ]

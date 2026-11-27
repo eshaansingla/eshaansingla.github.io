@@ -142,8 +142,8 @@ export default function RocketLeague() {
       statusLabel="off-hours"
       toolbar={
         <>
-          <div className="max-w-full overflow-x-auto">
-            <Seg size="sm" label="Playlist" value={id} onChange={(v) => { setId(v); setSel(null) }} options={RL.playlists.map((x) => [x.id, `${x.name} ${x.mode}`])} />
+          <div className="max-w-full overflow-x-auto sm:overflow-visible">
+            <Seg wrap size="sm" label="Playlist" value={id} onChange={(v) => { setId(v); setSel(null) }} options={RL.playlists.map((x) => [x.id, `${x.name} ${x.mode}`])} />
           </div>
           <span className="ml-auto font-mono text-[11.5px] text-mute">
             season reward <b className="font-medium text-ink">{RL.rewardLevel}</b>
@@ -219,17 +219,17 @@ export default function RocketLeague() {
           </div>
 
           {/* lifetime */}
-          <div className="mt-6 grid grid-cols-[minmax(0,1fr)_auto] gap-5">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-5 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3">
               {RL.lifetime.map((s) => (
                 <button
                   key={s.k}
                   onClick={() => setSel(sel === s.k ? null : s.k)}
                   className={`rounded-xl border p-3 text-left transition-colors ${sel === s.k ? 'border-signal bg-signal/[0.06]' : 'border-rule hover:border-ink/40'}`}
                 >
-                  <span className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.12em] text-mute">
-                    {s.k}
-                    {s.top && <span className="normal-case tracking-normal text-signal">{s.top.toLowerCase()}</span>}
+                  <span className="flex flex-wrap items-center justify-between gap-x-2 font-mono text-[10px] uppercase tracking-[0.12em] text-mute">
+                    <span className="whitespace-nowrap">{s.k}</span>
+                    {s.top && <span className="whitespace-nowrap normal-case tracking-normal text-signal">{s.top.toLowerCase()}</span>}
                   </span>
                   <span className="mt-1 block font-mono text-[20px] leading-none">
                     <Tween value={seen ? s.v : 0} format={(v) => Math.round(v).toLocaleString('en-IN')} duration={1.4} />
@@ -237,7 +237,7 @@ export default function RocketLeague() {
                 </button>
               ))}
             </div>
-            <div className="hidden flex-col items-center justify-center sm:flex">
+            <div className="flex flex-col items-center justify-center">
               <svg viewBox="-40 -40 80 80" className="h-24 w-24 -rotate-90">
                 <circle r="30" fill="none" className="stroke-ink/10" strokeWidth="7" />
                 <motion.circle

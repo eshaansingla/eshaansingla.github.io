@@ -183,10 +183,10 @@ export default function TrafficCam() {
           <button onClick={() => setPaused((p) => !p)} className="rounded-full border border-ink/20 px-3 py-1.5 font-mono text-[12px] transition-colors hover:border-ink" aria-pressed={paused}>
             {paused ? 'play' : 'pause'}
           </button>
-          <div className="ml-auto flex items-baseline gap-5">
-            <Stat label="tracked">{stats.tracked}</Stat>
-            <Stat label="false boxes / frame" accent={stats.fp > 0.05}><Tween value={stats.fp} format={(v) => v.toFixed(1)} duration={0.4} /></Stat>
-            <Stat label="precision, 5 s"><Tween value={stats.prec * 100} format={(v) => `${Math.round(v)}%`} duration={0.4} /></Stat>
+          <div className="ml-auto flex flex-wrap items-baseline gap-x-5 gap-y-1">
+            <Stat label="tracked" ch={2}>{stats.tracked}</Stat>
+            <Stat label="false boxes / frame" ch={4} accent={stats.fp > 0.05}><Tween value={stats.fp} format={(v) => v.toFixed(1)} duration={0.4} /></Stat>
+            <Stat label="precision, 5 s" ch={4}><Tween value={stats.prec * 100} format={(v) => `${Math.round(v)}%`} duration={0.4} /></Stat>
           </div>
         </>
       }

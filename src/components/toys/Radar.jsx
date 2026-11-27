@@ -81,6 +81,13 @@ function Spark({ walk, side, draw }) {
   )
 }
 
+// The longest title, question and answer any deal can produce. Each is laid out invisibly under the
+// real one, so the panel is always the height of the longest case and the page below never jumps.
+const longest = (xs) => xs.reduce((a, b) => (b.length > a.length ? b : a), '')
+const ALL = TICKERS.flatMap((ticker) => CATS.flatMap((cat) => ['BULK', 'BLOCK'].flatMap((type) => ['BUY', 'SELL'].map((side) => ({ ticker, cat, type, side, pct: 1.88 })))))
+const LONG_TITLE = longest(ALL.map((d) => `${d.ticker} ${d.side === 'BUY' ? 'bought' : 'sold'} 1.88% by a ${d.cat.toLowerCase()}`))
+const LONG_ANSWER = longest([OFFTOPIC, ...ALL.flatMap((d) => [explain(d, 'Llama-3.3-70b'), explain(d, 'rule engine')])])
+
 const NODES = [['intent', 'intent'], ['t1', 'Llama'], ['t2', 'GPT-4o mini'], ['t3', 'rules']]
 
 export default function Radar() {
@@ -169,7 +176,7 @@ export default function Radar() {
             </label>
           ))}
           <span className="font-mono text-[12px] text-mute">rule engine always on</span>
-          <div className="ml-auto flex items-baseline gap-5">
+          <div className="ml-auto flex flex-wrap items-baseline gap-x-5 gap-y-1">
             <Stat label="deals">{deals[0].id + 3}</Stat>
             <Stat label="last card render" accent>{render == null ? 'waiting' : `${render.toFixed(1)} ms`}</Stat>
           </div>
@@ -181,7 +188,7 @@ export default function Radar() {
         </>
       }
     >
-      <div ref={box} className="grid md:grid-cols-[300px_minmax(0,1fr)]">
+      <div ref={box} className="grid grid-cols-[minmax(0,1fr)] md:grid-cols-[300px_minmax(0,1fr)]">
         {/* feed */}
         <ul className="max-h-[460px] overflow-hidden border-b border-rule md:border-b-0 md:border-r">
           <AnimatePresence initial={false}>
@@ -218,8 +225,13 @@ export default function Radar() {
 
         {/* explanation */}
         <div className="flex min-h-[420px] flex-col p-5 md:p-6">
+          <div className="grid">
+          <div aria-hidden="true" className="invisible [grid-area:1/1]">
+            <p className="font-mono text-[11px] uppercase tracking-[0.14em]">BLOCK deal, 00:00:00 IST</p>
+            <p className="mt-1 text-[1.5rem] leading-tight">{LONG_TITLE}</p>
+          </div>
           <AnimatePresence mode="wait">
-            <motion.div key={selected.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.25 }}>
+            <motion.div key={selected.id} className="[grid-area:1/1]" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.25 }}>
               <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-mute">{selected.type} deal, {selected.time} IST</p>
               <p className="mt-1 text-[1.5rem] leading-tight">
                 <span className="font-mono font-semibold">{selected.ticker}</span>{' '}
@@ -228,6 +240,7 @@ export default function Radar() {
               </p>
             </motion.div>
           </AnimatePresence>
+          </div>
 
           {/* route strip */}
           <div className="mt-5 flex items-center gap-1.5">
@@ -238,11 +251,11 @@ export default function Radar() {
                 <div key={id} className="flex flex-1 items-center gap-1.5">
                   <motion.span
                     animate={s === 'fail' ? { x: [0, -3, 3, 0] } : { x: 0 }}
-                    className={`flex-1 rounded-lg border px-2 py-1.5 text-center font-mono text-[10.5px] transition-colors duration-200 ${
+                    className={`min-w-0 flex-1 whitespace-nowrap rounded-lg border px-1.5 py-1.5 text-center font-mono text-[10.5px] transition-colors duration-200 sm:px-2 ${
                       s === 'ok' ? 'border-signal bg-signal text-signal-ink' : s === 'pass' ? 'border-ink bg-ink text-canvas' : s === 'fail' ? 'border-ink/40 text-mute line-through' : down ? 'border-dashed border-ink/25 text-mute' : 'border-ink/20 text-ink-2'
                     }`}
                   >
-                    {label}
+                    {id === 't2' ? <><span className="lg:hidden">GPT-4o</span><span className="hidden lg:inline">{label}</span></> : label}
                   </motion.span>
                   {i < NODES.length - 1 && <span className="text-mute">›</span>}
                 </div>
@@ -251,18 +264,20 @@ export default function Radar() {
           </div>
 
           <div className="mt-4 flex-1 rounded-xl border border-rule bg-ink/[0.03] p-4">
-            <p className="font-mono text-[11px] text-mute">“{route.question}”</p>
-            <AnimatePresence>
-              {route.tier && (
-                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-2 font-mono text-[11px] text-signal">
-                  answered by {route.tier}
-                </motion.p>
-              )}
-            </AnimatePresence>
-            <p className="mt-1.5 min-h-[96px] text-[16.5px] leading-relaxed">
-              {route.text.slice(0, route.typed)}
-              {route.typed < route.text.length && route.tier && <span className="ml-0.5 inline-block h-4 w-[7px] translate-y-0.5 animate-pulse bg-signal" />}
-            </p>
+            <div className="grid">
+              <p aria-hidden="true" className="invisible font-mono text-[11px] [grid-area:1/1]">“Why did a foreign institution sell 1.88% of BHARTIARTL?”</p>
+              <p className="font-mono text-[11px] text-mute [grid-area:1/1]">“{route.question}”</p>
+            </div>
+            <motion.p aria-hidden={!route.tier} animate={{ opacity: route.tier ? 1 : 0 }} className="mt-2 font-mono text-[11px] text-signal">
+              answered by {route.tier || 'Llama-3.3-70b'}
+            </motion.p>
+            <div className="mt-1.5 grid text-[16.5px] leading-relaxed">
+              <p aria-hidden="true" className="invisible [grid-area:1/1]">{LONG_ANSWER}</p>
+              <p className="[grid-area:1/1]">
+                {route.text.slice(0, route.typed)}
+                {route.typed < route.text.length && route.tier && <span className="ml-0.5 inline-block h-4 w-[7px] translate-y-0.5 animate-pulse bg-signal" />}
+              </p>
+            </div>
           </div>
 
           <form className="mt-4 flex items-center gap-2 rounded-full border border-ink/20 bg-canvas py-1.5 pl-4 pr-1.5 focus-within:border-ink" onSubmit={(e) => { e.preventDefault(); if (q.trim()) { hold.current.auto = false; ask(selected, q.trim()) } }}>

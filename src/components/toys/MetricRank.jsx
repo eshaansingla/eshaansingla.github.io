@@ -58,11 +58,11 @@ export default function MetricRank() {
             className="relative grid w-full grid-cols-[30px_minmax(0,1fr)_76px] items-center gap-x-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-ink/[0.03] md:grid-cols-[30px_230px_minmax(0,1fr)_84px]"
           >
             <span className={`font-mono text-[12px] ${i === 0 ? 'text-signal' : 'text-mute'}`}>#{i + 1}</span>
-            <span className="flex items-center gap-2 text-[15.5px] leading-tight">
-              {r.s}
-              {r.local && <span className="rounded-full bg-ink/[0.07] px-1.5 py-0.5 font-mono text-[9.5px] text-mute">local model</span>}
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[15.5px] leading-tight">
+              <span>{r.s}</span>
+              {r.local && <span className="whitespace-nowrap rounded-full bg-ink/[0.07] px-1.5 py-0.5 font-mono text-[9.5px] text-mute">local model</span>}
               {i === 0 && (
-                <motion.span layoutId="winner" className="rounded-full bg-signal px-2 py-0.5 font-mono text-[9.5px] text-signal-ink">would ship</motion.span>
+                <motion.span layoutId="winner" className="whitespace-nowrap rounded-full bg-signal px-2 py-0.5 font-mono text-[9.5px] text-signal-ink">would ship</motion.span>
               )}
             </span>
             <span className="relative col-span-3 col-start-1 mt-2 h-2.5 overflow-hidden rounded-full bg-ink/[0.06] md:col-span-1 md:col-start-auto md:mt-0">
@@ -80,7 +80,7 @@ export default function MetricRank() {
           <AnimatePresence initial={false}>
             {open === r.s && (
               <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }} className="overflow-hidden">
-                <motion.div initial="h" animate="s" transition={{ staggerChildren: 0.06 }} className="grid gap-2 px-2 pb-3 pl-[42px] sm:grid-cols-3">
+                <motion.div initial="h" animate="s" transition={{ staggerChildren: 0.06 }} className="grid grid-cols-[minmax(0,1fr)] gap-2 px-2 pb-3 pl-[42px] sm:grid-cols-3">
                   {Object.entries(M).map(([key, mm]) => (
                     <motion.div key={key} variants={{ h: { opacity: 0, y: 6 }, s: { opacity: 1, y: 0 } }} className={`rounded-lg border p-2.5 ${key === m ? 'border-signal/50' : 'border-rule'}`}>
                       <div className="flex justify-between font-mono text-[10.5px] text-mute"><span>{mm.label}</span><span>rank {rankIn(key, r)} / 6</span></div>

@@ -135,7 +135,7 @@ export default function LegalDesk() {
         </>
       }
     >
-      <div className="grid md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
         {/* chat */}
         <div className="flex min-h-[300px] flex-col md:min-h-[420px]">
           <div ref={scroller} className="flex-1 space-y-3 overflow-y-auto px-4 py-4 md:max-h-[420px]">
@@ -193,7 +193,7 @@ export default function LegalDesk() {
               ))}
             </div>
             <form onSubmit={(e) => { e.preventDefault(); ask(input) }} className="flex items-center gap-2 rounded-full border border-ink/20 bg-canvas py-1 pl-4 pr-1 focus-within:border-signal">
-              <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask your own question…" aria-label="Ask NyaayaBot" className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-mute" />
+              <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask a question…" aria-label="Ask NyaayaBot" className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-mute" />
               <button type="submit" disabled={busy || !input.trim()} className="rounded-full bg-ink px-3.5 py-1.5 font-mono text-[12px] text-canvas transition-colors hover:bg-signal hover:text-signal-ink disabled:opacity-40">ask</button>
               {(turns.length > 0 || cur) && <button type="button" onClick={reset} className="rounded-full px-2.5 py-1.5 font-mono text-[11px] text-mute hover:text-ink">clear</button>}
             </form>
@@ -264,7 +264,7 @@ export default function LegalDesk() {
 
 function Step({ n, on, title, children }) {
   return (
-    <li className="grid grid-cols-[22px_1fr] gap-x-2">
+    <li className="grid grid-cols-[22px_minmax(0,1fr)] gap-x-2">
       <motion.span
         className="mt-0.5 grid h-[18px] w-[18px] place-items-center rounded-full font-mono text-[10px]"
         animate={{ backgroundColor: on ? 'var(--signal)' : 'color-mix(in srgb, var(--ink) 10%, transparent)', color: on ? 'var(--signal-ink)' : 'var(--mute)' }}

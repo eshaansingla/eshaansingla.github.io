@@ -21,13 +21,13 @@ export function Tween({ value, format = (v) => v.toFixed(0), duration = 0.6, cla
 }
 
 /** Segmented control with a sliding indicator. */
-export function Seg({ options, value, onChange, label, size = 'md' }) {
+export function Seg({ options, value, onChange, label, size = 'md', wrap = false }) {
   const id = useId()
   return (
     <div
       role="radiogroup"
       aria-label={label}
-      className="relative inline-flex rounded-full border border-ink/20 bg-canvas p-[3px]"
+      className={`relative border border-ink/20 bg-canvas p-[3px] ${wrap ? 'flex flex-wrap gap-y-0.5 rounded-[18px] sm:inline-flex sm:rounded-full' : 'inline-flex rounded-full'}`}
       onKeyDown={(e) => {
         if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
         e.preventDefault()
@@ -103,11 +103,12 @@ export function Toggle({ on, onChange, label }) {
 }
 
 /** Small "readout" stat used in figure toolbars. */
-export function Stat({ label, children, accent }) {
+export function Stat({ label, children, accent, ch }) {
   return (
-    <span className="inline-flex items-baseline gap-1.5 font-mono text-[12px]">
+    <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap font-mono text-[12px]">
       <span className="text-mute">{label}</span>
-      <b className={`font-medium ${accent ? 'text-signal' : 'text-ink'}`}>{children}</b>
+      {/* ch: the widest value in characters, reserved so a changing number never re-wraps the toolbar */}
+      <b className={`font-medium tabular-nums ${accent ? 'text-signal' : 'text-ink'}`} style={ch ? { display: 'inline-block', minWidth: `${ch}ch` } : undefined}>{children}</b>
     </span>
   )
 }

@@ -15,11 +15,13 @@ import DATA from '../../assets/pran_recordings.json'
  */
 
 const SESSIONS = {
-  1: { label: 'head-up 30°', tilt: 30 },
-  0: { label: 'supine', tilt: 0 },
-  2: { label: 'head-down 10°', tilt: -10 },
-  3: { label: 'Valsalva', tilt: 0 },
+  1: { label: 'head-up 30°', short: 'up 30°', tilt: 30 },
+  0: { label: 'supine', short: 'supine', tilt: 0 },
+  2: { label: 'head-down 10°', short: 'down 10°', tilt: -10 },
+  3: { label: 'Valsalva', short: 'Valsalva', tilt: 0 },
 }
+// session name, shortened on phones so all four fit in one row
+const Fit = ({ s }) => (<><span className="sm:hidden">{SESSIONS[s].short}</span><span className="hidden sm:inline">{SESSIONS[s].label}</span></>)
 const ORDER = [0, 1, 2, 3] // order the sessions were recorded in
 const TABS = {
   elevated: { file: 'elevated', csv: 'elevated.csv', who: 'subject 83 M', age: 83, start: 3, label: 'Elevated' },
@@ -130,7 +132,7 @@ export default function HardwareBench() {
       toolbar={
         <>
           <Seg label="Recording" value={tab} onChange={pickTab} options={Object.entries(TABS).map(([id, t]) => [id, t.label])} />
-          <div className="overflow-x-auto"><Seg size="sm" label="Session" value={String(session)} onChange={(v) => setSession(+v)} options={ORDER.map((s) => [String(s), SESSIONS[s].label])} /></div>
+          <div><Seg wrap size="sm" label="Session" value={String(session)} onChange={(v) => setSession(+v)} options={ORDER.map((s) => [String(s), <Fit key={s} s={s} />])} /></div>
           <button onClick={() => setPower((p) => !p)} aria-pressed={power} className="ml-auto rounded-full border border-ink/20 px-3 py-1.5 font-mono text-[12px] transition-colors hover:border-ink">{power ? 'pause' : 'play'}</button>
         </>
       }
@@ -141,7 +143,7 @@ export default function HardwareBench() {
         </>
       }
     >
-      <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         {/* the bench: tilt table, dummy, headphone sensor */}
         <div className="relative border-b border-rule lg:border-b-0 lg:border-r">
           <svg viewBox="0 -50 600 450" className="block h-auto w-full" role="img" aria-label={`Test dummy strapped to a tilt table, ${m.label}`}>
@@ -318,9 +320,9 @@ export default function HardwareBench() {
 
       {/* serial monitor */}
       <div className="border-t border-rule bg-[#111113] px-4 py-3 font-mono text-[10.5px] text-[#d8d4c8]">
-        <div className="mb-1.5 flex items-center justify-between text-[#8d877c]">
+        <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-4 text-[#8d877c]">
           <span>serial monitor, 115200 baud, {T.csv}</span>
-          <span>every 5th row of the window</span>
+          <span className="whitespace-nowrap">every 5th row of the window</span>
         </div>
         <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Serial monitor rows">
           <table className="w-full min-w-[640px] border-collapse text-right tabular-nums">
@@ -331,8 +333,12 @@ export default function HardwareBench() {
                   {r.map((v, i) => <td key={i} className="px-1">{i === 3 ? (v / 100).toFixed(2) : v}</td>)}
                 </tr>
               )) : (
-                <tr><td colSpan={14} className="py-3 text-center text-[#8d877c]">paused</td></tr>
+                <tr><td colSpan={14} className="text-center text-[#8d877c]">paused</td></tr>
               )}
+              {/* always eight lines tall, so the figure never changes height as rows arrive */}
+              {Array.from({ length: Math.max(0, 8 - (power || rows.length ? rows.length : 1)) }, (_, i) => (
+                <tr key={`pad${i}`} aria-hidden="true"><td colSpan={14}>&nbsp;</td></tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -385,7 +391,7 @@ function Classifier({ rec, seg, session, setSession, elevated, who }) {
               className={`absolute inset-y-0 rounded transition-colors ${b.s === session ? 'bg-signal/[0.12]' : 'bg-ink/[0.03] hover:bg-ink/[0.07]'}`}
               style={{ left: `${b.a}%`, width: `${b.b - b.a}%` }}
             >
-              <span className="absolute left-1 top-1 font-mono text-[9.5px] text-mute">{SESSIONS[b.s].label}</span>
+              <span className="absolute left-1 top-1 font-mono text-[9.5px] text-mute"><Fit s={b.s} /></span>
             </button>
           ))}
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">

@@ -317,7 +317,7 @@ export default function Paper() {
       </Row>
       <Row className="mt-10" note="From LeetCode and Codeforces, Nov 2026.">
         <p className="smallcaps mb-3 text-mute">Competitive programming</p>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2">
           <a href={lc.href} target="_blank" rel="noreferrer" className="group block rounded-xl border border-rule-2 bg-paper p-4 transition-colors hover:border-ink">
             <p className="font-mono text-[11px] text-mute">LeetCode</p>
             <p className="mt-1 text-[2.6rem] leading-none">{lc.rating}</p>
@@ -357,7 +357,7 @@ export default function Paper() {
       <Row>
         <ol className="space-y-2">
           {Object.entries(refs).map(([n, r]) => (
-            <li key={n} className="grid grid-cols-[40px_1fr] text-[16px] leading-snug">
+            <li key={n} className="grid grid-cols-[40px_minmax(0,1fr)] text-[16px] leading-snug">
               <span className="font-mono text-[13px] text-signal">[{n}]</span>
               <span>
                 <a href={r.href} target="_blank" rel="noreferrer" className="italic underline decoration-rule-2 underline-offset-2 hover:text-signal">{r.label}</a>

@@ -79,7 +79,11 @@ export default function OpsRoom() {
     }
     const patch = (city, id, p) => { const r = recs.get(`${city}#${id}`); if (r) { Object.assign(r, p); dirty = true } }
     const emit = (sim, t, p) => {
-      if (!recs.has(`${sim.c.n}#${t.id}`)) record(sim.c.n, t.id, { kind: t.kind, urg: t.urg, people: t.people, where: p.where })
+      if (!recs.has(`${sim.c.n}#${t.id}`)) {
+        // an update for an incident that has already scrolled out of the feed: nothing to show
+        if (!p.where) return
+        record(sim.c.n, t.id, { kind: t.kind, urg: t.urg, people: t.people, where: p.where })
+      }
       patch(sim.c.n, t.id, p)
     }
     const pushFeed = (t) => record('Patiala', t.id, { kind: t.kind, urg: t.urg, people: t.people, where: t.where })
@@ -672,7 +676,7 @@ export default function OpsRoom() {
         </>
       }
     >
-      <div className="grid md:grid-cols-[minmax(0,1fr)_270px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] md:grid-cols-[minmax(0,1fr)_270px]">
         <div
           ref={wrap}
           className="relative aspect-[760/420] w-full cursor-grab touch-none select-none overflow-hidden active:cursor-grabbing"
@@ -725,8 +729,8 @@ export default function OpsRoom() {
         <div className="relative border-t border-rule md:border-l md:border-t-0">
           <div className="md:absolute md:inset-0 md:flex md:flex-col">
           <p className="flex items-baseline justify-between gap-2 border-b border-rule px-4 py-2.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-mute">
-            <span>Field reports</span>
-            <span className="truncate normal-case tracking-normal text-ink-2">{focus ?? `worldwide, ${CITIES.length + 1} cities`}</span>
+            <span className="whitespace-nowrap">Field reports</span>
+            <span className="truncate normal-case tracking-normal text-ink-2">{focus ?? `all ${CITIES.length + 1} cities`}</span>
           </p>
           <ul className="max-h-[420px] overflow-hidden md:max-h-none md:flex-1 md:[mask-image:linear-gradient(to_bottom,#000_85%,transparent)]">
             <AnimatePresence initial={false}>
@@ -744,7 +748,7 @@ export default function OpsRoom() {
                     <span className={`text-[15px] leading-tight ${r.status === 'flagged' || r.status === 'falsealarm' ? 'line-through decoration-ink/40' : ''}`}>Incident {r.id}</span>
                     <span className={`font-mono text-[10px] uppercase tracking-wider ${r.escalated && r.status !== 'resolved' ? 'text-[#e5484d]' : r.urg === 'high' ? 'text-signal' : 'text-mute'}`}>{r.escalated && r.status !== 'resolved' ? 'escalated' : r.urg}</span>
                   </div>
-                  <dl className="mt-1.5 grid grid-cols-[52px_1fr] gap-y-0.5 font-mono text-[11px]">
+                  <dl className="mt-1.5 grid grid-cols-[52px_minmax(0,1fr)] gap-y-0.5 font-mono text-[11px]">
                     {[['need', r.kind], ['people', r.people], ['where', !focus && r.city === 'Patiala' ? `${r.where}, Patiala` : r.where]].map(([k, v], i) => (
                       <motion.div key={k} className="contents" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 + i * 0.35 }}>
                         <dt className="text-mute">{k}</dt>

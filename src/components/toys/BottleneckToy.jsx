@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Btn, Device, Panel, Stat, Tween } from '../kit'
 
@@ -17,6 +17,13 @@ const BEST = 7
 
 export default function BottleneckToy() {
   const [fixed, setFixed] = useState(() => new Set())
+  const barRef = useRef(null)
+  const [barW, setBarW] = useState(800)
+  useEffect(() => {
+    const ro = new ResizeObserver(([e]) => setBarW(e.contentRect.width))
+    ro.observe(barRef.current)
+    return () => ro.disconnect()
+  }, [])
   const t = (s) => (fixed.has(s.id) ? s.after : s.before)
   const total = STAGES.reduce((a, s) => a + t(s), 0)
   const saved = 1 - total / BASE
@@ -41,7 +48,7 @@ export default function BottleneckToy() {
         <>
           <Btn onClick={() => { setFixed(new Set()); setSel(null) }}>reset</Btn>
           <span className="font-mono text-[12px] text-mute">fix stages, spend as little effort as you can</span>
-          <div className="ml-auto flex items-baseline gap-5">
+          <div className="ml-auto flex flex-wrap items-baseline gap-x-5 gap-y-1">
             <Stat label="runtime"><Tween value={total} format={(v) => `${Math.round(v)} ms`} /></Stat>
             <Stat label="saved" accent={hit}><Tween value={saved * 100} format={(v) => `${v.toFixed(1)}%`} /></Stat>
             <Stat label="effort"><Tween value={effort} /></Stat>
@@ -60,7 +67,7 @@ export default function BottleneckToy() {
           <div className="mb-1.5 flex justify-between font-mono text-[9.5px] text-mute">
             {[0, 200, 400, 600, 800, 1000, 1200].map((ms) => <span key={ms}>{ms}</span>)}
           </div>
-          <div className="flex h-14 w-full gap-[3px]">
+          <div ref={barRef} className="flex h-14 w-full gap-[3px]">
             {STAGES.map((s) => {
               const isB = s.id === bottleneck.id
               const on = fixed.has(s.id)
@@ -86,8 +93,9 @@ export default function BottleneckToy() {
                       transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}
                     />
                   )}
-                  <span className="relative block px-2 pt-2">{t(s) / BASE > 0.085 ? s.name : ''}</span>
-                  <span className="relative block px-2 opacity-70">{t(s) / BASE > 0.085 ? `${t(s)} ms` : ''}</span>
+                  {/* labels only where the block is wide enough on this screen to hold them whole */}
+                  <span className="relative block px-2 pt-2">{(t(s) / BASE) * barW >= 84 ? s.name : ''}</span>
+                  <span className="relative block px-2 opacity-70">{(t(s) / BASE) * barW >= 54 ? `${t(s)} ms` : ''}</span>
                 </motion.button>
               )
             })}

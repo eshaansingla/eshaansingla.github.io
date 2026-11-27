@@ -5,7 +5,7 @@ import { EASE, useSeen } from './kit'
 /** Body row: main text column + margin note (sidenote on wide screens, inline note on small). */
 export function Row({ children, note, className = '', hang = false }) {
   return (
-    <div className={`mx-auto grid max-w-[1040px] gap-x-12 px-5 md:px-8 xl:grid-cols-[660px_1fr] ${className}`}>
+    <div className={`mx-auto grid max-w-[1040px] grid-cols-[minmax(0,1fr)] gap-x-12 px-5 md:px-8 xl:grid-cols-[660px_1fr] ${className}`}>
       <div>{children}</div>
       {note ? (
         <aside className={`mt-3 font-mono text-[12px] leading-[1.6] text-mute xl:mt-1.5 ${hang ? 'xl:relative xl:z-10 xl:h-0 xl:overflow-visible' : ''}`}>
@@ -121,7 +121,7 @@ export function Figure({ id, n, caption, children }) {
           />
         </svg>
       </div>
-      <figcaption className="mt-3.5 grid gap-x-6 gap-y-1 text-[15px] leading-snug sm:grid-cols-[72px_1fr] xl:grid-cols-[72px_588px]">
+      <figcaption className="mt-3.5 grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-1 text-[15px] leading-snug sm:grid-cols-[72px_1fr] xl:grid-cols-[72px_588px]">
         <span className="font-mono text-[12px] uppercase tracking-wider text-signal">Fig. {n}</span>
         <span className="italic text-ink-2">{caption}</span>
       </figcaption>

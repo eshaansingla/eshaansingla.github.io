@@ -116,9 +116,9 @@ function meowSound(pitch = 1, len = 1) {
   } catch { /* no sound */ }
 }
 
-// real kitten mews (CC0 recordings, see public/sounds/README.txt), fetched the first time she mews;
+// one sweet kitten mew (a CC0 recording, see public/sounds/README.txt), fetched the first time she mews;
 // the synthesised mew above stays as the fallback
-const MEW_FILES = [1, 2, 3, 4, 5, 6].map((i) => `${import.meta.env.BASE_URL}sounds/mew${i}.mp3`)
+const MEW_FILES = [`${import.meta.env.BASE_URL}sounds/mew.mp3`]
 let mews = null, mewLoading = null, lastMew = -1
 function loadMews() {
   if (mews || mewLoading) return mewLoading
@@ -143,7 +143,6 @@ function playMew(pitch = 1) {
       lastMew = i
       const src = audio.createBufferSource(), g = audio.createGain()
       src.buffer = mews[i]
-      src.playbackRate.value = pitch // a little different every time
       g.gain.value = 0.85
       src.connect(g); g.connect(audio.destination)
       src.start()
@@ -303,7 +302,7 @@ export default function CatVisit() {
       const c = cat
       c.meowT = 0.55 * len
       c.tiltT = 1.3; c.tiltDir = Math.random() < 0.5 ? -1 : 1
-      if (c.t > c.meowAt) { playMew(rnd(0.94, 1.1)); c.meowAt = c.t + 0.7 }
+      if (c.t > c.meowAt) { playMew(); c.meowAt = c.t + 0.9 }
       if (text) say(text, 1500)
     }
     const tame = (how) => {

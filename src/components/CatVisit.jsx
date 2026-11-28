@@ -394,7 +394,7 @@ export default function CatVisit() {
       if (!cat) { raf = 0; return }
       const c = cat, L = c.L, K = L.K
       c.t += dt; c.st += dt
-      const floor = innerHeight - 4
+      const floor = innerHeight - 10 // room under her for a tail wrapped round in front
       const head = c.headAt || [c.x, floor - 50 * K]
       const speed = Math.hypot(pvx, pvy)
       const pointerLive = fine && px != null && now - lastMove < 6000
@@ -889,11 +889,6 @@ export default function CatVisit() {
       ctx.setTransform(1, 0, 0, 1, 0, 0)
       ctx.clearRect(0, 0, cv.width, cv.height)
       ctx.setTransform(dpr * K * turn * (1 + sq * 0.6), 0, 0, dpr * K * (1 - sq), dpr * ox, dpr * (oy - lift))
-      if (c.roll > 0) {
-        // rolling over: turn the whole cat about the middle of her body
-        const a = c.roll * Math.PI
-        ctx.translate(0, -12.5); ctx.rotate(-a); ctx.translate(0, 12.5 - Math.sin(a) * 4)
-      }
       const scratchAt = pose === 'scratch' ? [POSES.sit.sh[0] + 2, POSES.sit.sh[1] - 12 + Math.sin(c.t * 34) * 2.2] : null
       // grooming: licking a paw, washing the face over an ear, or head down licking the chest
       const groomAt = pose !== 'groom' ? null
@@ -908,7 +903,7 @@ export default function CatVisit() {
         breath: ['sit', 'loaf', 'lie', 'scratch', 'groom'].includes(pose) ? (pose === 'loaf' ? 1.6 : 0.8) : 0, purr: c.purrT > 0,
         groom: groomAt || c.paw, paw2: c.paw2, scratch: scratchAt, swish: c.swish, flick: (c.state === 'mock' && c.mock === 'back') || c.state === 'annoyed',
         earTwitch: c.twitchT > 0, earLook: c.face > 0.5 ? c.look[0] * 0.8 : 0, headTilt: tiltClick + tiltLook + shake + (c.sneezeTilt || 0),
-        headPush: c.headPush, tailHook: c.tailHook,
+        headPush: c.headPush, tailHook: c.tailHook, roll: c.roll,
       })
 
       // hearts, z's and marks, the right way round above her head
@@ -1019,7 +1014,7 @@ export default function CatVisit() {
       if (!cat || e.target === hb || e.target === yb || yb.contains(e.target)) return
       if (onCat(e.clientX, e.clientY)) { tapNow(); return }
       if (e.target.closest?.('a, button, input, textarea, select, label, summary, [role], [tabindex], figure, canvas, svg, table, pre, code')) return
-      const floor = innerHeight - 4
+      const floor = innerHeight - 10 // room under her for a tail wrapped round in front
       const dd = Math.hypot(e.clientX - cat.x, e.clientY - (floor - 25 * cat.L.K))
       if (dd >= 110) return
       // with a finger, only a real tap counts as a miss, never the start of a scroll

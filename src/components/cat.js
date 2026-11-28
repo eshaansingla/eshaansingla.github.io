@@ -6,7 +6,7 @@
 export const POSES = {
   walk: { hip: [-20, -29], sh: [19, -30], head: [15, -12], tilt: 0.04, ear: 0, eye: 1, mouth: 0, tail: [1.05, 0.075, 0.1], gait: 1, mt: [-2, -8.5], tuck: 0 },
   run: { hip: [-23, -26], sh: [22, -26], head: [18, -6], tilt: 0.16, ear: 0.45, eye: 1, mouth: 0, tail: [0.25, 0.02, 0.16], gait: 1, mt: [-3, -8], tuck: 0 },
-  sit: { hip: [-15, -11], sh: [3, -33], head: [5, -16], tilt: 0, ear: 0, eye: 1, mouth: 0, tail: [-0.55, -0.17, 0.03], gait: 0, mt: [-16, -1.5], tuck: 0,
+  sit: { hip: [-15, -11], sh: [3, -33], head: [5, -16], tilt: 0, ear: 0, eye: 1, mouth: 0, tail: [0.05, -0.17, 0.03], gait: 0, mt: [-16, -1.5], tuck: 0,
     feet: { lf: [9, 0], rf: [6, 0], lh: [-5, 0], rh: [-3, 0] } },
   crouch: { hip: [-20, -19], sh: [18, -17], head: [15, -5], tilt: 0.12, ear: 0.85, eye: 1, mouth: 0, tail: [-0.1, 0.03, 0.05], gait: 0, mt: [-5, -7], tuck: 0,
     feet: { lf: [21, 0], rf: [24, 0], lh: [-17, 0], rh: [-14, 0] } },
@@ -14,7 +14,7 @@ export const POSES = {
     feet: { lf: [17, 0], rf: [15, 0], lh: [-6, 0], rh: [-4, 0] } },
   lie: { hip: [-16, -12.5], sh: [14, -12.5], head: [12, -7], tilt: 0.1, ear: 0, eye: 1, mouth: 0, tail: [-0.3, -0.12, 0.06], gait: 0, mt: [-4, -6.5], tuck: 0,
     feet: { lf: [21, -2], rf: [18, -1], lh: [-6, -2], rh: [-9, -1] } },
-  rear: { hip: [-9, -12], sh: [3, -45], head: [7, -15], tilt: -0.25, ear: 0, eye: 1, mouth: 0, tail: [-0.35, -0.18, 0.06], gait: 0, mt: [-15, -1.5], tuck: 0,
+  rear: { hip: [-9, -12], sh: [3, -45], head: [7, -15], tilt: -0.25, ear: 0, eye: 1, mouth: 0, tail: [0.1, -0.18, 0.06], gait: 0, mt: [-15, -1.5], tuck: 0,
     feet: { lf: [12, -30], rf: [9, -27], lh: [-3, 0], rh: [-1, 0] } },
   stretch: { hip: [-19, -31], sh: [15, -12], head: [17, -4], tilt: 0.25, ear: 0.2, eye: 0.3, mouth: 0, tail: [1.3, 0.05, 0.04], gait: 0, mt: [-2, -8.5], tuck: 0,
     feet: { lf: [34, 0], rf: [31, 0], lh: [-16, 0], rh: [-13, 0] } },
@@ -340,30 +340,57 @@ export function drawCat(ctx, s) {
   sg.addColorStop(0, s.dark ? 'rgba(0,0,0,0.5)' : 'rgba(70,40,15,0.22)'); sg.addColorStop(1, 'rgba(0,0,0,0)')
   ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(0, 0, rx, 0, Math.PI * 2); ctx.fill()
   ctx.restore()
+  // rolling onto her back: she turns about her spine, which side-on squashes her flat and then shows
+  // her upside down, back on the floor and paws in the air
+  const rollA = (s.roll || 0) * Math.PI
+  const rollV = (Math.sign(Math.cos(rollA)) || 1) * Math.max(0.45, Math.abs(Math.cos(rollA)))
+  const rollY = -12.5 * Math.abs(rollV) - Math.sin(rollA) * 1.5 - (1 - Math.cos(rollA)) * 1.2
+  if (s.roll > 0) { ctx.save(); ctx.translate(0, rollY); ctx.scale(1, rollV); ctx.translate(0, 12.5) }
 
   // ---- tail: a fluffy taper along the chain; along the floor it lies on the ground ----
   const back = Math.atan2(-u[1], -u[0])
   const [lift0, curl, amp] = p.tail
-  const tail = [P(-6.5, 5.5)]
+  // the tail is a chain of segments. In the air it bends in the side-on plane; once it reaches the floor
+  // it keeps turning but flat on the floor, round her and towards us, which side-on reads as the tail
+  // wrapping round in front of her feet (lower on the page the nearer it comes). The tip lifts off the floor
+  const tail = [P(-6.5, 5.5)], depth = [0]
+  let fl = null, prevA = 0
   for (let i = 1; i <= 15; i++) {
     const k = i / 15
     const a = back + lift0 + curl * i + amp * Math.sin(t * (s.flick ? 9 : 2.2) - i * 0.42) * (0.3 + k)
       + (s.swish || 0) * Math.sin(t * 5.5 - i * 0.5) * k + (s.tailHook || 0) * Math.max(0, i - 9) * 0.42
     const prev = tail[i - 1]
-    let tx = prev[0] + Math.cos(a) * 4.1, ty = prev[1] + Math.sin(a) * 4.1
-    if (ty > -2.3) { // on the floor the tail lies along it rather than bunching up
-      const dy = -2.3 - prev[1]
-      tx = prev[0] + (Math.cos(a) >= 0 ? 1 : -1) * Math.sqrt(Math.max(0, 16.81 - dy * dy)); ty = -2.3
+    if (!fl) {
+      let tx = prev[0] + Math.cos(a) * 4.1, ty = prev[1] + Math.sin(a) * 4.1
+      if (ty > -2.3) {
+        const dy = -2.3 - prev[1]
+        const dirX = Math.cos(a) >= 0 ? 1 : -1
+        tx = prev[0] + dirX * Math.sqrt(Math.max(0, 16.81 - dy * dy)); ty = -2.3
+        fl = { phi: dirX > 0 ? 0 : Math.PI, x: tx, z: 0, left: dirX < 0, turn: 0, wave: 0 }
+      }
+      tail.push([tx, ty]); depth.push(0)
+    } else {
+      // curling the way it was bending: round towards us, until it runs along in front of her
+      fl.turn -= curl * 3.4
+      fl.wave += a - prevA - curl
+      const turned = Math.max(-1.2, Math.min(2.95, fl.turn)) - fl.wave * 0.8
+      fl.phi = fl.left ? Math.PI - turned : Math.min(0.75, turned)
+      fl.x += Math.cos(fl.phi) * 4.1; fl.z += Math.sin(fl.phi) * 4.1
+      const tipLift = fl.z > 2 ? Math.max(0, i - 12) * 1.7 : 0
+      tail.push([fl.x, -2.3 + Math.max(-4, Math.min(3.4, fl.z * 0.36)) - tipLift]); depth.push(fl.z)
     }
-    tail.push([tx, ty])
+    prevA = a
   }
   // thick where it grows out of the rump, then a long even plume to a rounded tip
   const tw = tail.map((_, i) => { const k = i / 15; return 4.8 + 6.4 * Math.pow(1 - k, 2.2) + 0.9 * Math.sin(k * Math.PI) })
   const tailPath = taper(tail, tw, new Path2D(), true)
   // wrapped round in front of her, the tail still grows from behind: the part before it reaches the
   // floor is drawn behind the body, the rest in front
-  let wrapAt = tail.findIndex((q, i) => i > 1 && q[1] >= -2.31)
-  if (wrapAt < 0 || wrapAt > 9) wrapAt = 4
+  // the part that has come round in front of her is drawn over her; the rest, behind
+  let wrapAt = depth.findIndex((z) => z > 1.5)
+  const tailBehind = wrapAt < 0
+  if (tailBehind) wrapAt = 4
+  wrapAt = Math.max(2, Math.min(13, wrapAt - 1))
   const tailBackPath = taper(tail.slice(0, wrapAt + 2), tw.slice(0, wrapAt + 2), new Path2D(), true)
   const tailFrontPath = taper(tail.slice(wrapAt), tw.slice(wrapAt), new Path2D(), true)
   const tailHole = [tail[wrapAt][0], tail[wrapAt][1], tw[wrapAt] / 2 + 1.2]
@@ -455,7 +482,7 @@ export function drawCat(ctx, s) {
       ctx.stroke()
     }
   }
-  const tuck = p.tuck >= 0.5
+  const tuck = p.tuck >= 0.85
   const farG = !tuck ? legGeo(true) : null
   const nearG = !tuck ? legGeo(false) : null
 
@@ -507,14 +534,16 @@ export function drawCat(ctx, s) {
     lg.addColorStop(0, F.creamA); lg.addColorStop(1, F.cream)
     ctx.fillStyle = lg; ctx.fillRect(-140, -140, 280, 280)
     // a few rings round the legs, and the line of the thigh muscle
-    ctx.fillStyle = F.stripeS
+    // faint tabby bars on the upper legs only, brushed from the front edge
+    ctx.fillStyle = F.stripeS; ctx.globalAlpha = 0.6
     for (const [a, b] of [[g.knee, g.hock], [g.elbow, g.wrist]]) {
-      for (const k of [0.25, 0.6]) {
+      for (const k of [0.2, 0.45]) {
         const q = lerp2(a, b, k), dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1
         const nx = -dy / l, ny = dx / l
-        ctx.fill(taper([[q[0] + nx * 4, q[1] + ny * 4], q, [q[0] - nx * 4, q[1] - ny * 4]], [1.6, 2, 1.6]))
+        ctx.fill(taper([[q[0] + nx * 4, q[1] + ny * 4], q, [q[0] - nx * 1.5, q[1] - ny * 1.5]], [1.7, 1.3, 0.2]))
       }
     }
+    ctx.globalAlpha = 1
     radial(ctx, g.hp[0] + 1, g.hp[1] - 2, 11, F.hi, F.hiA)
   }
 
@@ -527,15 +556,19 @@ export function drawCat(ctx, s) {
     }
     layer(ctx, [[farG.hind, farShade], [farG.front, farShade], [farG.hindPaw, farShade], [farG.frontPaw, farShade]], F.far, line, 1.3)
   }
-  const tailBehind = p.tail[0] > -0.2
   // behind her, the tail is drawn in the same pass as the body, so it grows out of her with no seam
   const parts = [[tailBehind ? tailPath : tailBackPath, tailDetail]]
   parts.push([body, bodyDetail], [neck, bodyDetail], [ruff, bodyDetail])
   // sitting or lying, the thigh bunches into a round haunch
   const hs = Math.max(0, Math.min(1, (hip[1] + 21) / 8)) * (1 - p.gait)
-  if (hs > 0.05 && !tuck) parts.push([ell(hip[0] + 2, hip[1] + 1 - hs, 8 + hs * 5, 6 + hs * 4.5, Math.atan2(u[1], u[0]) * 0.5), () => { bodyDetail(); radial(ctx, hip[0] + 4, hip[1] - 3, 10, F.hi, F.hiA) }])
+  const haunch = hs > 0.05 && !tuck ? ell(hip[0] + 2, hip[1] + 1 - hs, 8 + hs * 5, 6 + hs * 4.5, Math.atan2(u[1], u[0]) * 0.5) : null
+  const haunchPart = haunch && [haunch, () => { bodyDetail(); radial(ctx, hip[0] + 4, hip[1] - 3, 10, F.hi, F.hiA) }]
+  // sitting or lying, the thigh is hidden inside the haunch and only the foot shows below it
+  if (haunchPart && !(nearG && hs > 0.5)) parts.push(haunchPart)
   if (nearG) {
-    parts.push([nearG.hind, legDetail(nearG, -30)], [nearG.front, legDetail(nearG, -34)])
+    parts.push([nearG.hind, legDetail(nearG, -30)])
+    if (haunchPart && hs > 0.5) parts.push(haunchPart)
+    parts.push([nearG.front, legDetail(nearG, -34)])
     parts.push([nearG.hindPaw, pawDetail(nearG.pawH, nearG.pr)], [nearG.frontPaw, pawDetail(nearG.wrist, nearG.pa)])
   } else {
     // loafing: paws tucked under the chest, haunch rounded
@@ -553,14 +586,16 @@ export function drawCat(ctx, s) {
     cp.arc(nearG.hp[0], nearG.hp[1] - 2, 10, 0, Math.PI * 2)
     cp.moveTo(sh[0] + 6, sh[1] + 1); cp.arc(sh[0] - 1, sh[1] + 1, 7, 0, Math.PI * 2)
     ctx.clip(cp, 'evenodd')
-    ctx.stroke(nearG.hind); ctx.stroke(nearG.front)
+    ctx.stroke(nearG.front)
+    if (haunch && hs > 0.5) { const hp2 = new Path2D(); hp2.rect(-600, -600, 1200, 1200); hp2.addPath(haunch); ctx.clip(hp2, 'evenodd') }
+    ctx.stroke(nearG.hind)
   }
   ctx.restore()
   if (nearG) {
     // the crease where the thigh meets the belly, and the elbow
     ctx.strokeStyle = 'rgba(70,30,5,0.3)'; ctx.lineWidth = 0.7; ctx.lineCap = 'round'
     const k = nearG.knee, h = nearG.hp
-    ctx.beginPath(); ctx.moveTo(h[0] + 7, h[1] - 3); ctx.quadraticCurveTo(k[0] + 5, (h[1] + k[1]) / 2, k[0] + 2.5, k[1] - 0.5); ctx.stroke()
+    if (hs < 0.3) { ctx.beginPath(); ctx.moveTo(h[0] + 7, h[1] - 3); ctx.quadraticCurveTo(k[0] + 5, (h[1] + k[1]) / 2, k[0] + 2.5, k[1] - 0.5); ctx.stroke() }
   }
   const drawClaws = () => {
     if (!(s.claws && nearG && nearG.raised)) return
@@ -586,7 +621,8 @@ export function drawCat(ctx, s) {
   const face = s.face || 0
   ctx.save()
   ctx.translate(hc[0], hc[1])
-  ctx.rotate(p.tilt + (s.headTilt || 0))
+  // on her back the head tips back, ears to the floor beside her, chin up
+  ctx.rotate(p.tilt + (s.headTilt || 0) - (s.roll > 0 ? (1 - Math.cos(rollA)) * 0.5 * 1.15 : 0))
   if (s.headScale) ctx.scale(s.headScale, 1) // keeps the head full width while the body swings round
   if (face < 1) { ctx.save(); ctx.globalAlpha = 1 - face; sideHead(ctx, s, F, p, line); ctx.restore() }
   if (face > 0) {
@@ -604,6 +640,8 @@ export function drawCat(ctx, s) {
     drawClaws()
   }
 
+  if (s.roll > 0) ctx.restore()
+  const headOut = s.roll > 0 ? [hc[0], rollY + rollV * (hc[1] + 12.5)] : hc
   const xs = [hip[0] - 14, sh[0] + 12, hc[0] + 14], ys = [Math.min(hip[1], sh[1]) - 12, hc[1] - 20]
-  return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: 0, head: hc }
+  return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: 0, head: headOut }
 }

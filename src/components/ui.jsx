@@ -4,11 +4,13 @@ import { refs } from '../data'
 import { EASE, useSeen } from './kit'
 
 /** Body row: main text column + margin note (sidenote on wide screens, inline note on small). */
-export function Row({ children, note, className = '', hang = false }) {
+export function Row({ children, note, side, className = '', hang = false }) {
   return (
     <div className={`mx-auto grid max-w-[1040px] grid-cols-[minmax(0,1fr)] gap-x-12 px-5 md:px-8 xl:grid-cols-[660px_1fr] ${className}`}>
       <div>{children}</div>
-      {note ? (
+      {side ? (
+        <div className="hidden xl:block">{side}</div>
+      ) : note ? (
         <aside className={`mt-3 font-mono text-[12px] leading-[1.6] text-mute xl:mt-1.5 ${hang ? 'xl:relative xl:z-10 xl:h-0 xl:overflow-visible' : ''}`}>
           <div className="border-l border-signal/60 pl-3">{note}</div>
         </aside>

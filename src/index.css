@@ -114,3 +114,4 @@
 }
 
 @keyframes sweep { from { left: 0%; } to { left: 100%; } }
+@keyframes blink { 50% { opacity: 0; } }

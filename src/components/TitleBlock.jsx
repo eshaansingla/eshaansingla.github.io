@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { Row, Num } from './ui'
 import { profile, profileLinks } from '../data'
 import ProjectIndex from './ProjectIndex'
+import Portrait from './Portrait'
 
 const EASE = [0.22, 1, 0.36, 1]
 // set at build time, so every deploy carries its own date
@@ -10,7 +11,14 @@ const REVISED = new Date(__BUILD_DATE__).toLocaleDateString('en-GB', { day: 'num
 export default function TitleBlock() {
   return (
     <div id="top">
-      <Row className="pt-14 md:pt-20">
+      <Row
+        className="pt-14 md:pt-20"
+        side={
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8, delay: 0.25 }} className="h-full pb-1">
+            <Portrait className="h-full" />
+          </motion.div>
+        }
+      >
         <motion.p
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6 }}
           className="font-mono text-[11.5px] text-mute"
@@ -53,6 +61,7 @@ export default function TitleBlock() {
               </motion.li>
             ))}
           </ul>
+          <Portrait className="mt-6 h-[340px] w-full max-w-[320px] xl:hidden" />
         </motion.div>
       </Row>
 

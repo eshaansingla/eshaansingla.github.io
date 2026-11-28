@@ -905,6 +905,7 @@ export default function CatVisit() {
         earTwitch: c.twitchT > 0, earLook: c.face > 0.5 ? c.look[0] * 0.8 : 0, headTilt: tiltClick + tiltLook + shake + (c.sneezeTilt || 0),
         headPush: c.headPush, tailHook: c.tailHook, roll: c.roll,
       })
+      c.lastBox = box
 
       // hearts, z's and marks, the right way round above her head
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)

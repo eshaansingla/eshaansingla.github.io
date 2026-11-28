@@ -348,39 +348,68 @@ export function drawCat(ctx, s) {
   if (s.roll > 0) { ctx.save(); ctx.translate(0, rollY); ctx.scale(1, rollV); ctx.translate(0, 12.5) }
 
   // ---- tail: a fluffy taper along the chain; along the floor it lies on the ground ----
-  const back = Math.atan2(-u[1], -u[0])
+  const backA = Math.atan2(-u[1], -u[0])
   const [lift0, curl, amp] = p.tail
   // the tail is a chain of segments. In the air it bends in the side-on plane; once it reaches the floor
   // it keeps turning but flat on the floor, round her and towards us, which side-on reads as the tail
   // wrapping round in front of her feet (lower on the page the nearer it comes). The tip lifts off the floor
-  const tail = [P(-6.5, 5.5)], depth = [0]
-  let fl = null, prevA = 0, touch = -1
-  for (let i = 1; i <= 15; i++) {
+  // Where the tail meets the floor and which way it then wraps are decided from the tail at rest, so
+  // the swaying and flicking never make it jump from one shape to another
+  // the plan is made from her pose alone, without breathing, purring or the walk's bob, so that tiny
+  // movements of her body never tip the tail from one shape to the other either
+  const uS0 = [p.sh[0] - p.hip[0], p.sh[1] - p.hip[1]], LS = Math.hypot(uS0[0], uS0[1])
+  const uS = [uS0[0] / LS, uS0[1] / LS], nS = [uS[1], -uS[0]]
+  const rootS = [p.hip[0] + uS[0] * -6.5 + nS[0] * 5.5, p.hip[1] + uS[1] * -6.5 + nS[1] * 5.5]
+  const backS = Math.atan2(-uS[1], -uS[0])
+  const wave = (i) => {
     const k = i / 15
-    const a = back + lift0 + curl * i + amp * Math.sin(t * (s.flick ? 9 : 2.2) - i * 0.42) * (0.3 + k)
+    return amp * Math.sin(t * (s.flick ? 9 : 2.2) - i * 0.42) * (0.3 + k)
       + (s.swish || 0) * Math.sin(t * 5.5 - i * 0.5) * k + (s.tailHook || 0) * Math.max(0, i - 9) * 0.42
-    const prev = tail[i - 1]
-    if (!fl) {
-      let tx = prev[0] + Math.cos(a) * 4.1, ty = prev[1] + Math.sin(a) * 4.1
-      if (ty > -2.3) {
-        const dy = -2.3 - prev[1]
-        const dirX = Math.cos(a) >= 0 ? 1 : -1
-        tx = prev[0] + dirX * Math.sqrt(Math.max(0, 16.81 - dy * dy)); ty = -2.3
-        fl = { phi: dirX > 0 ? 0 : Math.PI, x: tx, z: 0, left: dirX < 0, turn: 0, wave: 0 }; touch = i
-      }
-      tail.push([tx, ty]); depth.push(0)
-    } else {
-      // curling the way it was bending: round towards us, until it runs along in front of her
-      fl.turn -= curl * 3.4
-      fl.wave += a - prevA - curl
-      const turned = Math.max(-1.2, Math.min(2.95, fl.turn)) - fl.wave * 0.8
-      fl.phi = fl.left ? Math.PI - turned : Math.min(0.75, turned)
-      fl.x += Math.cos(fl.phi) * 4.1; fl.z += Math.sin(fl.phi) * 4.1
-      const tipLift = fl.z > 2 ? Math.max(0, i - 12) * 1.7 : 0
-      tail.push([fl.x, -2.3 + Math.max(-4, Math.min(3.4, fl.z * 0.36)) - tipLift]); depth.push(fl.z)
-    }
-    prevA = a
   }
+  // Everything here is continuous in the pose and in time: where the tail meets the floor is found to a
+  // fraction of a segment, and the curl along the floor is measured from that exact point, so as she
+  // sits, stands or shifts the tail flows from one shape to the next instead of jumping
+  const chain = (moving, plan) => {
+    const back = moving ? backA : backS
+    const pts = [moving ? P(-6.5, 5.5) : rootS], dep = [0]
+    const segA = (i) => back + lift0 + curl * i + (moving ? wave(i) : 0)
+    let cross = null
+    for (let i = 1; i <= 15 && !cross; i++) {
+      const a = segA(i), prev = pts[i - 1]
+      const nx = prev[0] + Math.cos(a) * 4.1, ny = prev[1] + Math.sin(a) * 4.1
+      if (ny > -2.3) {
+        const f = Math.max(0, Math.min(1, (-2.3 - prev[1]) / (ny - prev[1] || 1)))
+        // the heading along the floor it starts with: the way it was going, or towards us if it came
+        // straight down (so the shape never flips from one side to the other)
+        const c = Math.cos(a + (segA(i + 1) - a) * f) // eased towards the next segment's angle, so moving the touch-down point along never jumps
+        cross = { i, f, x: prev[0] + (nx - prev[0]) * f, phi0: (Math.PI / 2) * (1 - Math.sign(c) * Math.pow(Math.abs(c), 0.35)) }
+      } else { pts.push([nx, ny]); dep.push(0) }
+    }
+    if (!cross) return { pts, dep, touch: -1 }
+    // along the floor: integrate the heading from the touch-down point
+    const rate = -curl * 3.4 / 4.1, iC = cross.i - 1 + cross.f, w0 = moving ? wave(iC) : 0
+    let x = cross.x, z = 0, sAt = 0
+    const step = 0.5
+    for (let j = cross.i; j <= 15; j++) {
+      const target = (1 - cross.f) * 4.1 + (j - cross.i) * 4.1
+      while (sAt < target - 1e-6) {
+        const ds = Math.min(step, target - sAt), sm = sAt + ds / 2
+        const p0 = cross.phi0, end = 0.5
+        // curling round towards us and then forwards along her front; curled the other way, away behind her
+        let phi = rate >= 0
+          ? p0 + (end - p0) * Math.min(1, (rate * sm) / Math.max(0.4, Math.abs(p0 - end)))
+          : p0 + Math.min(1.2, -rate * sm) * (p0 >= Math.PI / 2 ? 1 : -1)
+        phi -= Math.cos(p0) * 0.8 * ((moving ? wave(iC + sm / 4.1) : 0) - w0)
+        x += Math.cos(phi) * ds; z += Math.sin(phi) * ds; sAt += ds
+      }
+      const tipLift = Math.max(0, j - 12) * 1.7 * Math.max(0, Math.min(1, z / 4))
+      pts.push([x, -2.3 + Math.max(-4, Math.min(3.4, z * 0.36)) - tipLift]); dep.push(z)
+    }
+    return { pts, dep, touch: cross.i }
+  }
+  const rest = chain(false)
+  const live = chain(true, rest)
+  const tail = live.pts, depth = rest.dep, touch = rest.touch
   // thick where it grows out of the rump, then a long even plume to a rounded tip
   const tw = tail.map((_, i) => { const k = i / 15; return 4.8 + 6.4 * Math.pow(1 - k, 2.2) + 0.9 * Math.sin(k * Math.PI) })
   const tailPath = taper(tail, tw, new Path2D(), true)
@@ -644,5 +673,5 @@ export function drawCat(ctx, s) {
   if (s.roll > 0) ctx.restore()
   const headOut = s.roll > 0 ? [hc[0], rollY + rollV * (hc[1] + 12.5)] : hc
   const xs = [hip[0] - 14, sh[0] + 12, hc[0] + 14], ys = [Math.min(hip[1], sh[1]) - 12, hc[1] - 20]
-  return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: 0, head: headOut }
+  return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: 0, head: headOut, tailPlan: [touch, wrapAt, tailBehind], tailPts: tail }
 }

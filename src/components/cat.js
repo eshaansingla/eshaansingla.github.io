@@ -1,11 +1,12 @@
-// A ginger cat drawn from a small skeleton: hip, shoulder, head, four two-bone legs and a tail chain,
-// shaded as solid forms (light from above and in front), in the site's own orange.
+// A ginger tabby, drawn as one illustrated animal over a small skeleton (hip, shoulder, head, four two-bone legs
+// and a tail chain): a single outlined silhouette with tapered legs, toed paws, a fluffy tail and ruffs, shaded
+// as one body, with brush-stroke tabby stripes and a little fur texture, in the site's own orange.
 // Local space: facing +x, the ground at y = 0, up is negative y. One unit is one CSS pixel before scaling.
 
 export const POSES = {
   walk: { hip: [-20, -29], sh: [19, -30], head: [15, -12], tilt: 0.04, ear: 0, eye: 1, mouth: 0, tail: [1.05, 0.075, 0.1], gait: 1, mt: [-2, -8.5], tuck: 0 },
   run: { hip: [-23, -26], sh: [22, -26], head: [18, -6], tilt: 0.16, ear: 0.45, eye: 1, mouth: 0, tail: [0.25, 0.02, 0.16], gait: 1, mt: [-3, -8], tuck: 0 },
-  sit: { hip: [-15, -11], sh: [3, -33], head: [5, -16], tilt: 0, ear: 0, eye: 1, mouth: 0, tail: [-0.55, -0.22, 0.03], gait: 0, mt: [-16, -1.5], tuck: 0,
+  sit: { hip: [-15, -11], sh: [3, -33], head: [5, -16], tilt: 0, ear: 0, eye: 1, mouth: 0, tail: [-0.55, -0.17, 0.03], gait: 0, mt: [-16, -1.5], tuck: 0,
     feet: { lf: [9, 0], rf: [6, 0], lh: [-5, 0], rh: [-3, 0] } },
   crouch: { hip: [-20, -19], sh: [18, -17], head: [15, -5], tilt: 0.12, ear: 0.85, eye: 1, mouth: 0, tail: [-0.1, 0.03, 0.05], gait: 0, mt: [-5, -7], tuck: 0,
     feet: { lf: [21, 0], rf: [24, 0], lh: [-17, 0], rh: [-14, 0] } },
@@ -39,22 +40,19 @@ const hex = (h) => { h = String(h).trim().replace('#', ''); if (h.length === 3) 
 const mix = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k))
 const rgba = (c, a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})`
 /** Fur colours built from the site's accent, so the cat is the same orange as the page. */
-/** Colour codes for the flat, pixel look: the caller recolours them after snapping to the pixel grid. */
-export const FLAT = {
-  flat: true, base: '#ff0000', lit: '#ff0000', dark: '#ff0000', deep: '#ff0000', far: '#00ff00', farLit: '#00ff00', farDark: '#00ff00',
-  light: '#ff0000', belly: '#ff0000', stripe: '#ff0000', ear: '#ff0000', nose: '#ff0000', eye: '#0000ff', eyeDeep: '#0000ff', mouth: '#0000ff',
-}
 export function makePalette(accent) {
   const o = hex(accent || '#c2410c'), W = [255, 255, 255], K = [10, 4, 0]
   return {
     base: rgba(o), lit: rgba(mix(o, W, 0.22)), dark: rgba(mix(o, K, 0.32)), deep: rgba(mix(o, K, 0.55)),
     far: rgba(mix(o, K, 0.3)), farLit: rgba(mix(o, K, 0.14)), farDark: rgba(mix(o, K, 0.5)),
     light: rgba(mix(o, W, 0.4)), belly: rgba(mix(o, W, 0.6)), stripe: rgba(mix(o, K, 0.5), 0.32),
-    ear: '#eba49c', nose: '#c66f6a', eye: '#b8c63c', eyeDeep: '#7d8a1e',
+    stripeS: rgba(mix(o, K, 0.42), 0.5), line: rgba(mix(o, K, 0.72), 0.85), cream: rgba(mix(o, [255, 247, 236], 0.68)),
+    creamA: rgba(mix(o, [255, 247, 236], 0.72), 0), hi: 'rgba(255,240,222,0.34)', hiA: 'rgba(255,240,222,0)',
+    ear: '#eba49c', earDeep: '#c97c78', nose: '#d0817d', eye: '#b8c63c', eyeDeep: '#6f7c17',
   }
 }
 
-// ---------- shapes ----------
+// ---------- geometry helpers ----------
 function ik(root, target, a, b, bend) {
   let dx = target[0] - root[0], dy = target[1] - root[1]
   let d = Math.hypot(dx, dy)
@@ -65,186 +63,249 @@ function ik(root, target, a, b, bend) {
   return [[root[0] + Math.cos(t) * a, root[1] + Math.sin(t) * a], [root[0] + dx, root[1] + dy]]
 }
 
-// a tapered limb segment, shaded like a cylinder lit from above
-function capsule(ctx, a, b, wa, wb, shade) {
-  const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1
-  const nx = -dy / L, ny = dx / L
-  if (shade) {
-    const up = ny <= 0 ? 1 : -1, w = Math.max(wa, wb) / 2
-    const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2
-    const g = ctx.createLinearGradient(mx + nx * w * up, my + ny * w * up, mx - nx * w * up, my - ny * w * up)
-    g.addColorStop(0, shade[0]); g.addColorStop(0.42, shade[1]); g.addColorStop(1, shade[2])
-    ctx.fillStyle = g
-  }
-  ctx.beginPath()
-  ctx.moveTo(a[0] + nx * wa / 2, a[1] + ny * wa / 2)
-  ctx.lineTo(b[0] + nx * wb / 2, b[1] + ny * wb / 2)
-  ctx.arc(b[0], b[1], wb / 2, Math.atan2(ny, nx), Math.atan2(-ny, -nx), true)
-  ctx.lineTo(a[0] - nx * wa / 2, a[1] - ny * wa / 2)
-  ctx.arc(a[0], a[1], wa / 2, Math.atan2(-ny, -nx), Math.atan2(ny, nx), true)
-  ctx.fill()
-}
-
-function smooth(ctx, pts) {
+// a smooth curve through points (Catmull-Rom as Béziers); `closed` joins the end back to the start
+function through(path, pts, closed, skipMove) {
   const n = pts.length
-  ctx.beginPath()
-  ctx.moveTo(pts[0][0], pts[0][1])
+  if (!skipMove) path.moveTo(pts[0][0], pts[0][1])
+  const last = closed ? n : n - 1
+  for (let i = 0; i < last; i++) {
+    const p0 = pts[closed ? (i - 1 + n) % n : Math.max(0, i - 1)], p1 = pts[i]
+    const p2 = pts[closed ? (i + 1) % n : i + 1], p3 = pts[closed ? (i + 2) % n : Math.min(n - 1, i + 2)]
+    path.bezierCurveTo(p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6, p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6, p2[0], p2[1])
+  }
+  if (closed) path.closePath()
+  return path
+}
+
+// a limb, tail or stroke: a smooth outline round a spine of points, `w` wide at each, with a rounded end
+function taper(pts, w, path = new Path2D(), capStart = false) {
+  const n = pts.length
+  const L = [], Rr = []
   for (let i = 0; i < n; i++) {
-    const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n]
-    ctx.bezierCurveTo(p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6, p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6, p2[0], p2[1])
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)]
+    let tx = b[0] - a[0], ty = b[1] - a[1]
+    const l = Math.hypot(tx, ty) || 1
+    tx /= l; ty /= l
+    const nx = -ty, ny = tx, h = w[i] / 2
+    L.push([pts[i][0] + nx * h, pts[i][1] + ny * h])
+    Rr.push([pts[i][0] - nx * h, pts[i][1] - ny * h])
   }
-  ctx.closePath()
+  through(path, L, false)
+  // round end
+  const e = pts[n - 1], a = pts[n - 2]
+  const ang = Math.atan2(L[n - 1][1] - e[1], L[n - 1][0] - e[0])
+  const dirA = Math.atan2(e[1] - a[1], e[0] - a[0])
+  const ccw = Math.sin(dirA - ang) < 0
+  path.arc(e[0], e[1], w[n - 1] / 2, ang, ang + Math.PI, ccw)
+  through(path, Rr.slice().reverse(), false, true)
+  if (capStart) {
+    const s0 = pts[0], s1 = pts[1], d = Math.atan2(s1[1] - s0[1], s1[0] - s0[0])
+    path.arc(s0[0], s0[1], w[0] / 2, d - Math.PI / 2, d + Math.PI / 2, true)
+  }
+  path.closePath()
+  return path
 }
 
-function ellipse(ctx, x, y, rx, ry, rot = 0) { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); ctx.fill() }
+const ell = (x, y, rx, ry, rot = 0, path = new Path2D()) => { path.moveTo(x + rx * Math.cos(rot), y + rx * Math.sin(rot)); path.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); return path }
 
-// sphere-ish shading: bright towards the upper front, dark underneath
-function ball(ctx, x, y, rx, ry, F, rot = 0) {
-  const g = ctx.createRadialGradient(x + rx * 0.25, y - ry * 0.45, Math.min(rx, ry) * 0.15, x, y, Math.max(rx, ry) * 1.15)
-  g.addColorStop(0, F.lit); g.addColorStop(0.55, F.base); g.addColorStop(1, F.dark)
+function radial(ctx, x, y, r, c0, c1, r0 = 0) {
+  const g = ctx.createRadialGradient(x, y, r0, x, y, r)
+  g.addColorStop(0, c0); g.addColorStop(1, c1)
   ctx.fillStyle = g
-  ellipse(ctx, x, y, rx, ry, rot)
+  ctx.fillRect(x - r, y - r, r * 2, r * 2)
 }
 
-function eye(ctx, F, open, rx, ry, look, pupilW) {
-  if (F.flat) {
-    // a solid black eye, or a line when shut
-    ctx.fillStyle = F.eye
-    const lx = Math.max(-1, Math.min(1, look[0])) * 1.1, ly = Math.max(-1, Math.min(1, look[1])) * 0.8
-    if (open > 0.3) ctx.fillRect(-1.4 + lx, -2.3 + ly, 2.8, 4.6 * Math.min(1, open + 0.2))
-    else ctx.fillRect(-2.2, -0.2, 4.4, 1.4)
-    return
+// one shape group drawn as a single animal: outline every part, fill every part over it (so only the outer
+// silhouette keeps its line), then shade and texture each part in the same world-space light
+function layer(ctx, parts, fill, line, lineW, hole) {
+  ctx.save()
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round'
+  ctx.strokeStyle = line; ctx.lineWidth = lineW
+  if (hole) { // no outline inside this circle, where a part grows out of the body
+    ctx.save()
+    const cp = new Path2D(); cp.rect(-600, -600, 1200, 1200); cp.arc(hole[0], hole[1], hole[2], 0, Math.PI * 2)
+    ctx.clip(cp, 'evenodd')
   }
+  for (const [ph] of parts) ctx.stroke(ph)
+  if (hole) ctx.restore()
+  ctx.fillStyle = fill
+  for (const [ph] of parts) ctx.fill(ph)
+  for (const [ph, detail] of parts) if (detail) { ctx.save(); ctx.clip(ph); detail(); ctx.restore() }
+  ctx.restore()
+}
+
+// fixed fur-texture flicks in body coordinates (along the spine 0..1, across -1..1), so they move with her
+const FLICKS = Array.from({ length: 46 }, (_, i) => {
+  const r = (k) => { const x = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return x - Math.floor(x) }
+  return [r(1) * 1.25 - 0.18, r(2) * 2 - 1, 1.6 + r(3) * 2.2, r(4) - 0.5, r(5) > 0.45]
+})
+
+function eye(ctx, F, open, rx, ry, look, pupilW, side = 1) {
   if (open > 0.08) {
     const g = ctx.createRadialGradient(look[0] * 0.6, look[1] * 0.6, 0.2, 0, 0, rx)
     g.addColorStop(0, F.eye); g.addColorStop(1, F.eyeDeep)
     ctx.fillStyle = g
-    ellipse(ctx, 0, 0, rx, ry * open)
+    ctx.beginPath(); ctx.ellipse(0, 0, rx, ry * open, 0, 0, Math.PI * 2); ctx.fill()
     ctx.save()
     ctx.beginPath(); ctx.ellipse(0, 0, rx, ry * open, 0, 0, Math.PI * 2); ctx.clip()
-    ctx.fillStyle = '#140d05'
-    ellipse(ctx, look[0], look[1] * open, Math.max(0.45, rx * pupilW * 0.62), ry * 0.92)
-    ctx.fillStyle = 'rgba(255,255,255,0.9)'
-    ctx.beginPath(); ctx.arc(look[0] + rx * 0.3, look[1] * open - ry * 0.35 * open, Math.max(0.35, rx * 0.17), 0, Math.PI * 2); ctx.fill()
-    ctx.fillStyle = 'rgba(40,20,0,0.25)'
-    ellipse(ctx, 0, -ry * open * 1.05, rx * 1.2, ry * open * 0.55)
+    ctx.fillStyle = '#120b04'
+    ctx.beginPath(); ctx.ellipse(look[0], look[1] * open, Math.max(0.45, rx * pupilW * 0.62), ry * 0.95, 0, 0, Math.PI * 2); ctx.fill()
+    ctx.fillStyle = 'rgba(255,255,255,0.92)'
+    ctx.beginPath(); ctx.arc(look[0] + rx * 0.32, look[1] * open - ry * 0.36 * open, Math.max(0.38, rx * 0.18), 0, Math.PI * 2); ctx.fill()
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'
+    ctx.beginPath(); ctx.arc(look[0] - rx * 0.28, look[1] * open + ry * 0.4 * open, Math.max(0.2, rx * 0.08), 0, Math.PI * 2); ctx.fill()
+    ctx.fillStyle = 'rgba(40,20,0,0.28)' // the upper lid's shadow
+    ctx.beginPath(); ctx.ellipse(0, -ry * open * 1.05, rx * 1.2, ry * open * 0.55, 0, 0, Math.PI * 2); ctx.fill()
     ctx.restore()
   }
-  ctx.strokeStyle = '#3a200c'; ctx.lineWidth = 0.75
-  if (open > 0.08) { ctx.beginPath(); ctx.ellipse(0, 0, rx * 1.02, Math.max(0.2, ry * open), 0, 0, Math.PI * 2); ctx.stroke() }
-  else { ctx.beginPath(); ctx.moveTo(-rx, 0.1); ctx.quadraticCurveTo(0, ry * 0.55, rx, 0.1); ctx.stroke() }
+  ctx.strokeStyle = '#2e1808'; ctx.lineWidth = 0.8; ctx.lineCap = 'round'
+  if (open > 0.08) {
+    ctx.beginPath(); ctx.ellipse(0, 0, rx * 1.03, Math.max(0.2, ry * open), 0, 0, Math.PI * 2); ctx.stroke()
+    // a flick at the outer corner, like a lash line
+    ctx.beginPath(); ctx.moveTo(side * rx * 0.95, -0.2); ctx.lineTo(side * rx * 1.35, -0.6); ctx.stroke()
+  } else { ctx.beginPath(); ctx.moveTo(-rx, 0.1); ctx.quadraticCurveTo(0, ry * 0.6, rx * 1.2, -0.2); ctx.stroke() }
 }
 
 function whiskers(ctx, s, list) {
-  if (s.flat) return
-  ctx.strokeStyle = s.dark ? 'rgba(248,240,228,0.6)' : 'rgba(80,52,30,0.38)'
-  ctx.lineWidth = 0.45
-  for (const [x0, y0, ex, ey] of list) { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo(x0 + (ex - x0) * 0.5, y0 + (ey - y0) * 0.25, ex, ey); ctx.stroke() }
+  ctx.strokeStyle = s.dark ? 'rgba(248,240,228,0.62)' : 'rgba(80,52,30,0.4)'
+  ctx.lineWidth = 0.42
+  for (const [x0, y0, ex, ey] of list) { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo(x0 + (ex - x0) * 0.5, y0 + (ey - y0) * 0.2, ex, ey); ctx.stroke() }
 }
 
 // ---------- heads ----------
-function sideHead(ctx, s, F, p) {
-  const t = s.t
-  const ear = (near) => {
-    ctx.save()
-    ctx.translate(near ? 0.5 : -4.5, -6.5)
-    ctx.rotate(-p.ear * 0.75 + (s.earTwitch && near ? Math.sin(t * 30) * 0.15 : 0))
-    ctx.fillStyle = near ? F.base : F.far
-    ctx.beginPath(); ctx.moveTo(-4.6, 1.5); ctx.quadraticCurveTo(-3.2, -6, -1.2, -10.5); ctx.quadraticCurveTo(2.5, -5, 4.6, 0.5); ctx.closePath(); ctx.fill()
-    if (near) {
-      ctx.fillStyle = F.ear
-      ctx.beginPath(); ctx.moveTo(-2.4, 0); ctx.quadraticCurveTo(-1.8, -4.5, -1, -7.2); ctx.quadraticCurveTo(1.2, -3.8, 2.4, -0.3); ctx.closePath(); ctx.fill()
-    }
-    ctx.restore()
-  }
-  ear(false)
-  ball(ctx, 0, -0.5, 10.2, 8.8, F)
-  ball(ctx, 2.5, 3, 9, 6.2, F, 0.1)
-  const mg = ctx.createRadialGradient(9.5, 1.5, 0.5, 9.2, 2.6, 5)
-  mg.addColorStop(0, F.belly); mg.addColorStop(1, F.light)
-  ctx.fillStyle = mg
-  ellipse(ctx, 9.2, 2.6, 4.4, 3.6, 0.15)
-  ctx.strokeStyle = F.stripe; ctx.lineWidth = 1.3; ctx.lineCap = 'round'
-  for (const [x0, y0, x1, y1] of [[-2, -8.6, 1, -4.5], [1.5, -8.4, 3.2, -4.8], [-5.5, -7, -2.5, -3.6]]) { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke() }
-  ear(true)
-  const open = Math.max(0, Math.min(1, p.eye * (1 - (s.blink || 0))))
-  ctx.save(); ctx.translate(5.6, -1.6); if (!F.flat) ctx.rotate(-0.12)
-  const sl = s.look || [0, 0]
-  eye(ctx, F, open, 2.7, 2.3, [Math.max(-1.2, Math.min(1.4, 0.5 + sl[0] * (s.dir || 1) * 1.2)), Math.max(-1, Math.min(1, sl[1] * 1.1))], s.pupil || 0.55)
+function ear(cx, by, w, h, sgn, back, twitch) {
+  // an ear as a curved triangle on base point (cx, by); sgn -1 left, 1 right; swings out and back when annoyed
+  const rot = sgn * (0.2 + back * 0.75) + twitch
+  const c = Math.cos(rot), s = Math.sin(rot)
+  const R = ([x, y]) => [cx + x * c - y * s, by + x * s + y * c]
+  const outer = new Path2D()
+  const b0 = R([-w / 2, 1.5]), tip = R([sgn * 0.6, -h]), b1 = R([w / 2, 1.5])
+  const m0 = R([-w * 0.42, -h * 0.55]), m1 = R([w * 0.36, -h * 0.5])
+  outer.moveTo(...b0); outer.quadraticCurveTo(...m0, ...tip); outer.quadraticCurveTo(...m1, ...b1); outer.closePath()
+  const inner = new Path2D()
+  const i0 = R([-w * 0.3, 0.6]), it = R([sgn * 0.45, -h * 0.72]), i1 = R([w * 0.28, 0.6])
+  inner.moveTo(...i0); inner.quadraticCurveTo(...R([-w * 0.26, -h * 0.4]), ...it); inner.quadraticCurveTo(...R([w * 0.22, -h * 0.38]), ...i1); inner.closePath()
+  return { outer, inner, tufts: [[R([-w * 0.12, 0]), R([-w * 0.05, -h * 0.42])], [R([w * 0.1, 0]), R([w * 0.04, -h * 0.4])], [R([0, 0.2]), R([sgn * 0.2, -h * 0.5])]] }
+}
+
+function innerEar(ctx, F, e) {
+  ctx.save()
+  ctx.clip(e.inner)
+  const g = ctx.createLinearGradient(...e.tufts[2][1], ...e.tufts[2][0])
+  g.addColorStop(0, F.earDeep); g.addColorStop(1, F.ear)
+  ctx.fillStyle = g; ctx.fill(e.inner)
   ctx.restore()
+  ctx.strokeStyle = 'rgba(255,246,236,0.75)'; ctx.lineWidth = 0.35
+  for (const [a, b] of e.tufts) { ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke() }
+}
+
+function sideHead(ctx, s, F, p, line) {
+  const t = s.t
+  const tw = s.earTwitch ? Math.sin(t * 30) * 0.12 : 0
+  const farEar = ear(-4.6, -7.2, 7.2, 10.5, -1, p.ear, 0)
+  const nearEar = ear(0.2, -8, 7.6, 11, 1, p.ear * 0.9, tw)
+  // the far ear, behind and darker
+  layer(ctx, [[farEar.outer]], F.far, line, 1.3)
+  const skull = through(new Path2D(), [
+    [-9.6, -0.5], [-8.2, -5], [-4.6, -8.6], [0.8, -9.4], [5.2, -7.6], [8.6, -4.6], [11.6, -1.8], [12.9, 0.2], [12.4, 1.9],
+    [10.8, 3.4], [9.6, 4.8], [7.6, 6.7], [3.6, 7.6], [0.4, 8.6], [-1.6, 7.7], [-3.4, 9.2], [-5.4, 7.6], [-7.6, 8.4], [-8.4, 5.6],
+  ], true)
+  layer(ctx, [[nearEar.outer], [skull, () => {
+    const g = ctx.createLinearGradient(0, -10, 0, 9)
+    g.addColorStop(0, F.dark); g.addColorStop(0.45, F.base); g.addColorStop(1, F.light)
+    ctx.fillStyle = g; ctx.fillRect(-14, -12, 30, 24)
+    radial(ctx, 1, -5.5, 7, F.hi, F.hiA)
+    radial(ctx, 9.4, 2.6, 5.2, F.cream, F.creamA) // muzzle
+    radial(ctx, 4.5, 6.4, 5, F.cream, F.creamA) // chin and throat
+    // forehead and cheek stripes
+    ctx.fillStyle = F.stripeS
+    for (const [a, b, c] of [[[-2.6, -9.6], [-0.8, -6.4], [0.4, -4.2]], [[1, -9.4], [1.8, -6.6], [2.6, -5]], [[-6, -8], [-4.4, -5.6], [-3.4, -4]]]) ctx.fill(taper([a, b, c], [1.8, 1.1, 0.2]))
+    for (const [a, b, c] of [[[-6.5, 1.5], [-3.5, 1], [-0.6, 1.8]], [[-6, 4.2], [-3.4, 3.8], [-1, 4.4]]]) ctx.fill(taper([a, b, c], [1.5, 1, 0.2]))
+  }]], F.base, line, 1.4)
+  innerEar(ctx, F, nearEar)
+  const open = Math.max(0, Math.min(1, p.eye * (1 - (s.blink || 0))))
+  const sl = s.look || [0, 0]
+  ctx.save(); ctx.translate(5.4, -2.4); ctx.rotate(-0.16)
+  eye(ctx, F, open, 2.7, 2.2, [Math.max(-1.2, Math.min(1.4, 0.5 + sl[0] * (s.dir || 1) * 1.2)), Math.max(-1, Math.min(1, sl[1] * 1.1))], s.pupil || 0.55)
+  ctx.restore()
+  // nose and mouth
   ctx.fillStyle = F.nose
-  ctx.beginPath(); ctx.moveTo(12.4, 0.2); ctx.lineTo(13.6, 0.6); ctx.lineTo(12.9, 1.9); ctx.closePath(); ctx.fill()
+  ctx.beginPath(); ctx.moveTo(11.6, -0.2); ctx.quadraticCurveTo(13.4, -0.3, 13.2, 0.9); ctx.quadraticCurveTo(12.6, 1.8, 11.9, 1.6); ctx.closePath(); ctx.fill()
+  ctx.strokeStyle = line; ctx.lineWidth = 0.6; ctx.lineCap = 'round'
   if (p.mouth > 0.05) {
-    ctx.fillStyle = F.mouth || '#5b1f1c'; ellipse(ctx, 10.6, 4.4 + p.mouth * 1.6, 2.6, 0.6 + p.mouth * 2.8, 0.25)
-    ctx.fillStyle = '#d9737a'; ellipse(ctx, 10.2, 5.4 + p.mouth * 2.6, 1.6, 0.4 + p.mouth * 1.1, 0.25)
-  } else {
-    ctx.strokeStyle = F.deep; ctx.lineWidth = 0.6
-    ctx.beginPath(); ctx.moveTo(12.9, 1.9); ctx.quadraticCurveTo(12.4, 3.8, 10.4, 4.1); ctx.stroke()
-  }
-  whiskers(ctx, s, [[10.5, 2.2, 23, -1], [10.5, 3, 23.5, 3], [10.5, 3.6, 22, 6.5]])
+    ctx.fillStyle = '#5b1f1c'; ctx.beginPath(); ctx.ellipse(10.4, 4.1 + p.mouth * 1.6, 2.4, 0.6 + p.mouth * 2.6, 0.25, 0, Math.PI * 2); ctx.fill()
+    ctx.fillStyle = '#d9737a'; ctx.beginPath(); ctx.ellipse(10, 5 + p.mouth * 2.5, 1.5, 0.4 + p.mouth * 1, 0.25, 0, Math.PI * 2); ctx.fill()
+  } else { ctx.beginPath(); ctx.moveTo(12.4, 1.8); ctx.quadraticCurveTo(12, 3.4, 10.2, 3.9); ctx.stroke() }
+  whiskers(ctx, s, [[10.6, 2.2, 23, -1.4], [10.6, 3, 23.6, 2.6], [10.4, 3.6, 22.2, 6.4]])
 }
 
 // the head turned to face the viewer, eyes following s.look (-1..1 each way)
-function frontHead(ctx, s, F, p) {
+function frontHead(ctx, s, F, p, line) {
   const t = s.t
   const lk = s.look || [0, 0]
-  const turn = lk[0] * 1.4
-  const ear = (sgn) => {
-    ctx.save()
-    ctx.translate(sgn * 6.4 + turn * 0.3, -7.2)
-    ctx.rotate(sgn * (0.18 + p.ear * 0.7) + (s.earTwitch && sgn > 0 ? Math.sin(t * 28) * 0.12 : 0) + (s.earLook || 0) * 0.2)
-    const g = ctx.createLinearGradient(0, -12, 0, 2)
-    g.addColorStop(0, F.dark); g.addColorStop(1, F.base)
-    ctx.fillStyle = g
-    ctx.beginPath(); ctx.moveTo(-4.8, 1.8); ctx.quadraticCurveTo(-3, -6, -0.2, -11.5); ctx.quadraticCurveTo(3, -6, 4.8, 1.8); ctx.closePath(); ctx.fill()
-    ctx.fillStyle = F.ear
-    ctx.beginPath(); ctx.moveTo(-2.8, 0.6); ctx.quadraticCurveTo(-1.7, -4.5, -0.2, -8); ctx.quadraticCurveTo(1.7, -4.5, 2.8, 0.6); ctx.closePath(); ctx.fill()
-    ctx.strokeStyle = 'rgba(255,240,230,0.6)'; ctx.lineWidth = 0.35
-    for (const k of [-1, 0, 1]) { ctx.beginPath(); ctx.moveTo(k * 1.2, 0); ctx.lineTo(k * 0.6, -4.5); ctx.stroke() }
-    ctx.restore()
-  }
-  ear(-1); ear(1)
-  ball(ctx, turn * 0.4, -1, 11.2, 9.6, F)
-  ball(ctx, turn * 0.5, 3.2, 12.4, 7.6, F)
-  ctx.strokeStyle = F.stripe; ctx.lineWidth = 1.2; ctx.lineCap = 'round'
-  const fx = turn * 0.6
-  for (const [x0, y0, x1, y1] of [[-0.2, -9.8, 0.2, -5], [-3, -9.3, -1.6, -5.6], [3, -9.3, 1.8, -5.6], [-6, -7.6, -4.2, -5]]) { ctx.beginPath(); ctx.moveTo(x0 + fx, y0); ctx.lineTo(x1 + fx, y1); ctx.stroke() }
-  for (const sg of [-1, 1]) { ctx.beginPath(); ctx.moveTo(sg * 8.5 + fx, 1.5); ctx.quadraticCurveTo(sg * 10.5 + fx, 2.5, sg * 11.6 + fx, 1); ctx.stroke() }
+  const turn = lk[0] * 1.3
+  const tw = s.earTwitch ? Math.sin(t * 28) * 0.12 : 0
+  const el = s.earLook || 0
+  const L = ear(-6.6 + turn * 0.3, -7.2, 8.4, 11.4, -1, p.ear, el * 0.2)
+  const Rr = ear(6.6 + turn * 0.3, -7.2, 8.4, 11.4, 1, p.ear, tw + el * 0.2)
+  const fx = turn * 0.55
+  const skull = through(new Path2D(), [
+    [-6.8 + fx, -8.6], [-2.6 + fx, -10.4], [2.6 + fx, -10.4], [6.8 + fx, -8.6], [9.8, -5.2], [11.4, -1.2], [12.6, 2],
+    [13.8, 3.4], [12.2, 4.4], [13.2, 5.8], [11, 6.8], [7.8 + fx, 8.8], [3 + fx, 10.1], [fx, 10.5], [-3 + fx, 10.1],
+    [-7.8 + fx, 8.8], [-11, 6.8], [-13.2, 5.8], [-12.2, 4.4], [-13.8, 3.4], [-12.6, 2], [-11.4, -1.2], [-9.8, -5.2],
+  ], true)
   const mx = turn
-  const mg = ctx.createRadialGradient(mx, 4.2, 0.5, mx, 5.2, 6.5)
-  mg.addColorStop(0, F.belly); mg.addColorStop(1, F.light)
-  ctx.fillStyle = mg
-  ellipse(ctx, mx - 2.5, 5.6, 3.4, 2.7); ellipse(ctx, mx + 2.5, 5.6, 3.4, 2.7); ellipse(ctx, mx, 8.2, 2.8, 1.8)
+  layer(ctx, [[L.outer], [Rr.outer], [skull, () => {
+    const g = ctx.createLinearGradient(0, -11, 0, 11)
+    g.addColorStop(0, F.dark); g.addColorStop(0.5, F.base); g.addColorStop(1, F.light)
+    ctx.fillStyle = g; ctx.fillRect(-16, -13, 32, 26)
+    radial(ctx, fx - 1.5, -5.5, 8, F.hi, F.hiA)
+    radial(ctx, mx - 2.6, 4.9, 4.6, F.cream, F.creamA) // muzzle pads
+    radial(ctx, mx + 2.6, 4.9, 4.6, F.cream, F.creamA)
+    radial(ctx, mx, 8.6, 4.4, F.cream, F.creamA) // chin
+    radial(ctx, fx - 4.6, -0.6, 4.4, 'rgba(255,240,222,0.22)', F.hiA) // pale rims round the eyes
+    radial(ctx, fx + 4.6, -0.6, 4.4, 'rgba(255,240,222,0.22)', F.hiA)
+    // the tabby M on the forehead, and the cheek lines
+    ctx.fillStyle = F.stripeS
+    for (const [a, b, c] of [[[fx, -10.6], [fx - 0.1, -7.6], [fx, -5.2]], [[fx - 3.2, -10.2], [fx - 2.4, -7.6], [fx - 1.5, -5.8]], [[fx + 3.2, -10.2], [fx + 2.4, -7.6], [fx + 1.5, -5.8]],
+      [[fx - 7, -8.4], [fx - 5.6, -6.6], [fx - 4.4, -5.2]], [[fx + 7, -8.4], [fx + 5.6, -6.6], [fx + 4.4, -5.2]]]) ctx.fill(taper([a, b, c], [1.9, 1.2, 0.25]))
+    for (const sg of [-1, 1]) for (const [y0, y1] of [[1.2, 0.6], [3.6, 3.4]]) ctx.fill(taper([[sg * 12.8, y0], [sg * 10.6 + fx, (y0 + y1) / 2], [sg * 8.4 + fx, y1]], [1.6, 1.1, 0.2]))
+  }]], F.base, line, 1.4)
+  innerEar(ctx, F, L); innerEar(ctx, F, Rr)
   const open = Math.max(0, Math.min(1, p.eye * (1 - (s.blink || 0))))
   for (const sg of [-1, 1]) {
-    ctx.save(); ctx.translate(sg * 4.7 + turn * 0.9, -0.4); if (!F.flat) ctx.rotate(sg * -0.16)
-    eye(ctx, F, open, 2.9, 2.5, [Math.max(-1.6, Math.min(1.6, lk[0] * 1.7)), Math.max(-1.2, Math.min(1.2, lk[1] * 1.2))], s.pupil || 0.5)
+    ctx.save(); ctx.translate(sg * 4.7 + turn * 0.9, -0.6); ctx.rotate(sg * -0.14)
+    eye(ctx, F, open, 3, 2.6, [Math.max(-1.6, Math.min(1.6, lk[0] * 1.7)), Math.max(-1.2, Math.min(1.2, lk[1] * 1.2))], s.pupil || 0.5, sg)
     ctx.restore()
   }
+  // nose, mouth
   ctx.fillStyle = F.nose
-  ctx.beginPath(); ctx.moveTo(mx - 1.6, 3.2); ctx.lineTo(mx + 1.6, 3.2); ctx.lineTo(mx, 5); ctx.closePath(); ctx.fill()
+  ctx.beginPath(); ctx.moveTo(mx - 1.9, 3.1); ctx.quadraticCurveTo(mx, 2.6, mx + 1.9, 3.1); ctx.quadraticCurveTo(mx + 0.9, 4.6, mx, 5); ctx.quadraticCurveTo(mx - 0.9, 4.6, mx - 1.9, 3.1); ctx.fill()
+  ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.ellipse(mx - 0.5, 3.4, 0.6, 0.3, 0, 0, Math.PI * 2); ctx.fill()
+  ctx.strokeStyle = line; ctx.lineWidth = 0.6; ctx.lineCap = 'round'
   if (p.mouth > 0.05) {
-    ctx.fillStyle = F.mouth || '#5b1f1c'; ellipse(ctx, mx, 7.4 + p.mouth * 1.4, 2.4 + p.mouth * 0.6, 0.6 + p.mouth * 3)
-    ctx.fillStyle = '#d9737a'; ellipse(ctx, mx, 8.2 + p.mouth * 2.6, 1.6, 0.4 + p.mouth * 1.2)
+    ctx.fillStyle = '#5b1f1c'; ctx.beginPath(); ctx.ellipse(mx, 7.2 + p.mouth * 1.4, 2.3 + p.mouth * 0.6, 0.6 + p.mouth * 2.9, 0, 0, Math.PI * 2); ctx.fill()
+    ctx.fillStyle = '#d9737a'; ctx.beginPath(); ctx.ellipse(mx, 8 + p.mouth * 2.5, 1.5, 0.4 + p.mouth * 1.1, 0, 0, Math.PI * 2); ctx.fill()
     ctx.fillStyle = '#fbf6ee'
-    for (const sg of [-1, 1]) { ctx.beginPath(); ctx.moveTo(mx + sg * 1.9, 6.9); ctx.lineTo(mx + sg * 1.5, 7.9 + p.mouth); ctx.lineTo(mx + sg * 1.1, 6.9); ctx.fill() }
+    for (const sg of [-1, 1]) { ctx.beginPath(); ctx.moveTo(mx + sg * 1.9, 6.8); ctx.lineTo(mx + sg * 1.5, 7.8 + p.mouth); ctx.lineTo(mx + sg * 1.1, 6.8); ctx.fill() }
   } else {
-    ctx.strokeStyle = F.deep; ctx.lineWidth = 0.6
-    ctx.beginPath(); ctx.moveTo(mx, 5); ctx.lineTo(mx, 6.2); ctx.quadraticCurveTo(mx - 1.2, 7.4, mx - 2.4, 6.6); ctx.moveTo(mx, 6.2); ctx.quadraticCurveTo(mx + 1.2, 7.4, mx + 2.4, 6.6); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(mx, 5); ctx.lineTo(mx, 6.2); ctx.quadraticCurveTo(mx - 1.2, 7.4, mx - 2.5, 6.5); ctx.moveTo(mx, 6.2); ctx.quadraticCurveTo(mx + 1.2, 7.4, mx + 2.5, 6.5); ctx.stroke()
   }
   const w = []
-  for (const sg of [-1, 1]) for (const [dy, ey] of [[-0.2, -2.5], [0.6, 1.5], [1.4, 5]]) w.push([mx + sg * 4.6, 5.4 + dy, mx + sg * 17, 5 + ey])
+  for (const sg of [-1, 1]) for (const [dy, ey] of [[-0.2, -2.6], [0.6, 1.4], [1.4, 5]]) w.push([mx + sg * 4.4, 5.4 + dy, mx + sg * 17.5, 5 + ey])
   whiskers(ctx, s, w)
 }
 
 /**
- * Draw the cat. s: { pose, cyc, gaitKind, t, dark, palette, dir, breath, purr, blink, look, face, pupil, groom, flick, swish, earTwitch, headTilt }
- * Returns a box around the body and head in local units, for hit testing.
+ * Draw the cat. s: { pose, cyc, gaitKind, t, dark, palette, dir, breath, purr, blink, look, face, pupil, groom, paw2,
+ *   scratch, flick, swish, earTwitch, earLook, headTilt, headPush, tailHook, claws, headScale }
+ * Returns a box around the body and head in local units, for hit testing, and the head's centre.
  */
 export function drawCat(ctx, s) {
   const F = s.palette || makePalette()
   const p = s.pose
   const t = s.t
+  const line = F.line
   const run = s.gaitKind === 'run'
   const bob = p.gait * Math.sin(s.cyc * Math.PI * 4) * (run ? 1.8 : 0.7)
   const br = (s.breath || 0) * Math.sin(t * 2.2) * 0.7
@@ -269,122 +330,223 @@ export function drawCat(ctx, s) {
   const n = [u[1], -u[0]]
   const P = (a, b) => [hip[0] + u[0] * a + n[0] * b, hip[1] + u[1] * a + n[1] * b]
 
-  // floor shadow: a soft pool under the body
-  if (!F.flat) {
+  // ---- floor shadow: a soft pool under the body ----
   const sx0 = Math.min(hip[0], sh[0]) - 16, sx1 = Math.max(hip[0], sh[0]) + 18
   const cx = (sx0 + sx1) / 2 + 3, rx = (sx1 - sx0) / 2 + 6
   ctx.save()
   ctx.translate(cx, 0.6); ctx.scale(1, 4.2 / rx)
   const sg = ctx.createRadialGradient(0, 0, 0, 0, 0, rx)
-  sg.addColorStop(0, s.dark ? 'rgba(0,0,0,0.55)' : 'rgba(70,40,15,0.24)'); sg.addColorStop(1, 'rgba(0,0,0,0)')
+  sg.addColorStop(0, s.dark ? 'rgba(0,0,0,0.5)' : 'rgba(70,40,15,0.22)'); sg.addColorStop(1, 'rgba(0,0,0,0)')
   ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(0, 0, rx, 0, Math.PI * 2); ctx.fill()
   ctx.restore()
-  }
 
-  // tail chain; it lies along the floor instead of going through it
+  // ---- tail: a fluffy taper along the chain; along the floor it lies on the ground ----
   const back = Math.atan2(-u[1], -u[0])
   const [lift0, curl, amp] = p.tail
-  const tail = [P(-10, 7)]
+  const tail = [P(-9, 7)]
   for (let i = 1; i <= 15; i++) {
     const k = i / 15
-    const a = back + lift0 + curl * i + amp * Math.sin(t * (s.flick ? 9 : 2.4) - i * 0.45) * (0.3 + k) + (s.swish || 0) * Math.sin(t * 6 - i * 0.5) * k + (s.tailHook || 0) * Math.max(0, i - 9) * 0.42
+    const a = back + lift0 + curl * i + amp * Math.sin(t * (s.flick ? 9 : 2.2) - i * 0.42) * (0.3 + k)
+      + (s.swish || 0) * Math.sin(t * 5.5 - i * 0.5) * k + (s.tailHook || 0) * Math.max(0, i - 9) * 0.42
     const prev = tail[i - 1]
-    tail.push([prev[0] + Math.cos(a) * 4.1, Math.min(-2, prev[1] + Math.sin(a) * 4.1)])
-  }
-  const tailDraw = () => {
-    for (let i = 1; i < tail.length; i++) {
-      const k = i / tail.length
-      const ring = i % 3 === 0 || i > tail.length - 3
-      capsule(ctx, tail[i - 1], tail[i], lerp(8.4, 4, k), lerp(8.4, 4, k + 1 / tail.length), ring ? [F.dark, F.dark, F.deep] : [F.lit, F.base, F.dark])
+    let tx = prev[0] + Math.cos(a) * 4.1, ty = prev[1] + Math.sin(a) * 4.1
+    if (ty > -2.3) { // on the floor the tail lies along it rather than bunching up
+      const dy = -2.3 - prev[1]
+      tx = prev[0] + (Math.cos(a) >= 0 ? 1 : -1) * Math.sqrt(Math.max(0, 16.81 - dy * dy)); ty = -2.3
     }
+    tail.push([tx, ty])
+  }
+  const tw = tail.map((_, i) => { const k = i / 15; return lerp(9.2, 4.6, k) * (1 + 0.14 * Math.sin(k * Math.PI)) })
+  const tailPath = taper(tail, tw, new Path2D(), true)
+  const tailHole = [tail[0][0], tail[0][1], 5.6]
+  const tailDetail = () => {
+    const g = ctx.createLinearGradient(tail[0][0], tail[0][1] - 6, tail[0][0], tail[0][1] + 6)
+    g.addColorStop(0, F.base); g.addColorStop(1, F.dark)
+    ctx.fillStyle = F.base; ctx.fillRect(-140, -140, 280, 280)
+    // rings, darker towards the tip, and a dark tip
+    ctx.fillStyle = F.stripeS
+    for (let i = 3; i < 15; i += 2) {
+      const a = tail[i], b = tail[i + 1] || a
+      const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1
+      const nx = -dy / l, ny = dx / l, h = tw[i] / 2 + 1
+      ctx.fill(taper([[a[0] + nx * h, a[1] + ny * h], [a[0] + dx * 0.3, a[1] + dy * 0.3], [a[0] - nx * h, a[1] - ny * h]], [2.2, 2.6, 2.2]))
+    }
+    radial(ctx, ...tail[15], 6, F.stripeS, 'rgba(0,0,0,0)')
+    // fur along the tail
+    ctx.strokeStyle = 'rgba(255,236,214,0.1)'; ctx.lineWidth = 0.4
+    for (let i = 1; i < 15; i++) { const a = tail[i]; ctx.beginPath(); ctx.moveTo(a[0], a[1] - tw[i] * 0.25); ctx.lineTo(tail[i + 1][0], tail[i + 1][1] - tw[i] * 0.3); ctx.stroke() }
   }
 
-  const legs = (far) => {
+  // ---- legs: tapered from a full thigh or shoulder to a slim ankle, ending in a toed paw ----
+  const legGeo = (far) => {
     const fl = far ? 'rf' : 'lf', hl = far ? 'rh' : 'lh'
-    const off = far ? 2.5 : 0
-    const sh3 = far ? [F.farLit, F.far, F.farDark] : [F.lit, F.base, F.dark]
-    const hp = [hip[0] + off, hip[1] + 2]
+    const off = far ? 2.6 : 0
+    // hind
     const scratching = s.scratch && !far
+    const hp = [hip[0] + off, hip[1] + 1]
     const pawH = scratching ? s.scratch.slice() : foot(hl); pawH[0] += off
     const hock = scratching ? [pawH[0] - 9, pawH[1] + 7] : [pawH[0] + p.mt[0], pawH[1] + p.mt[1]]
     const [knee] = ik(hp, hock, 15, 14, scratching ? -1 : 1)
-    capsule(ctx, hp, knee, 11, 6.5, sh3)
-    if (!far) {
-      // the thigh muscle, which is most of what you see of a cat's back leg
-      const mx = hp[0] * 0.55 + knee[0] * 0.45, my = hp[1] * 0.55 + knee[1] * 0.45
-      const th = Math.atan2(knee[1] - hp[1], knee[0] - hp[0])
-      const tg = ctx.createRadialGradient(mx - 2, my - 5, 1.5, mx, my, 13.5)
-      tg.addColorStop(0, F.lit); tg.addColorStop(0.5, F.base); tg.addColorStop(1, F.dark)
-      ctx.fillStyle = tg
-      ellipse(ctx, mx, my, 12.5, 9.5, th)
-      ctx.strokeStyle = F.stripe; ctx.lineWidth = 2.1
-      for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.ellipse(mx, my, 8 + k * 2.6, 6 + k * 2, th, -2.4, -1.2); ctx.stroke() }
-    }
-    capsule(ctx, knee, hock, 6.2, 4.2, sh3)
-    capsule(ctx, hock, pawH, 4.2, 3.8, sh3)
-    ctx.fillStyle = far ? F.far : F.light
-    ellipse(ctx, pawH[0] + 1.5, pawH[1] - 1.6, 3.6, 2.1)
-    const sp = [sh[0] + off - 1, sh[1] + 3]
+    if (knee[1] > -2.5) knee[1] = -2.5
+    const hind = taper([[hp[0] - 2, hp[1] - 3], hp, knee, hock, pawH], far ? [14, 13, 7, 4.6, 4.2] : [16, 15.5, 7.6, 4.8, 4.4])
+    const hindPaw = ell(pawH[0] + 1.8, pawH[1] - 1.9, 4.3, 2.5, 0)
+    // front
+    const spt = [sh[0] + off - 1, sh[1] + 3]
     const pawF = foot(fl); pawF[0] += off
-    const grooming = (s.groom && !far) || (s.paw2 && far)
-    const target = grooming ? (far ? [s.paw2[0] - off, s.paw2[1]] : s.groom) : [pawF[0] - 1, pawF[1] - 2.2]
-    const [elbow, wrist] = ik(sp, target, 15.5, 15, grooming ? -1 : 1)
-    capsule(ctx, sp, elbow, 10, 5.8, sh3)
-    capsule(ctx, elbow, wrist, 5.4, 4, sh3)
-    ctx.fillStyle = far ? F.far : F.light
-    ellipse(ctx, wrist[0] + 1.8, wrist[1] + 0.6, 3.8, 2.2, grooming ? -0.6 : 0)
+    const raised = (s.groom && !far) || (s.paw2 && far)
+    const target = raised ? (far ? [s.paw2[0] - off, s.paw2[1]] : s.groom) : [pawF[0] - 1, pawF[1] - 2.2]
+    const [elbow, wrist] = ik(spt, target, 15.5, 15, raised ? -1 : 1)
+    if (elbow[1] > -3) elbow[1] = -3 // lying down, the forearm rests on the floor
+    const front = taper([[spt[0], spt[1] - 4], spt, elbow, wrist], far ? [10, 10, 6, 4.3] : [12, 11.5, 6.4, 4.5])
+    // a raised paw points along the forearm and spreads its toes when the claws come out
+    const pa = raised ? Math.atan2(wrist[1] - elbow[1], wrist[0] - elbow[0]) : 0
+    const spread = raised && !far ? (s.claws || 0) : 0
+    const frontPaw = raised
+      ? ell(wrist[0] + Math.cos(pa) * 1.9, wrist[1] + Math.sin(pa) * 1.9, 4.4 + spread * 0.5, 2.6 + spread * 0.7, pa)
+      : ell(wrist[0] + 1.9, wrist[1] + 0.5, 4.4, 2.5, 0)
+    return { hind, hindPaw, front, frontPaw, knee, hock, pawH, elbow, wrist, raised, hp }
   }
-
-  if (p.tuck < 0.5) legs(true)
-  const tailBehind = p.tail[0] > -0.2
-  if (tailBehind) tailDraw()
-
-  // body, shaded as a solid: lit back, belly in shade, soft occlusion low down
-  const pts = [P(-12, 1.5), P(-5, 12), P(L * 0.5, 10.3), P(L, 11.5), P(L + 6, 7), P(L + 10, -2.5), P(L + 3, -13), P(L * 0.55, -12.4), P(5, -11.5), P(-8, -8)]
-  const g = ctx.createLinearGradient(...P(L / 2, 13), ...P(L / 2, -13))
-  g.addColorStop(0, F.dark); g.addColorStop(0.3, F.base); g.addColorStop(0.75, F.light); g.addColorStop(1, F.belly)
-  ctx.fillStyle = g
-  smooth(ctx, pts); ctx.fill()
-  ctx.save()
-  smooth(ctx, pts); ctx.clip()
-  const hl = ctx.createRadialGradient(...P(L * 0.62, 9), 1, ...P(L * 0.62, 9), L * 0.75)
-  hl.addColorStop(0, 'rgba(255,236,214,0.32)'); hl.addColorStop(1, 'rgba(255,236,214,0)')
-  ctx.fillStyle = hl; ctx.fillRect(-120, -120, 240, 240)
-  ctx.strokeStyle = F.stripe; ctx.lineWidth = 2.6; ctx.lineCap = 'round'
-  for (let i = 0; i < 7; i++) {
-    const a = -7 + (i * (L + 12)) / 6.5
-    ctx.beginPath(); ctx.moveTo(...P(a, 13)); ctx.quadraticCurveTo(...P(a + 2, 5), ...P(a - 3.5, -3 + (i % 2) * 2)); ctx.stroke()
+  const pawDetail = (pawPt, rot) => () => {
+    ctx.fillStyle = F.light; ctx.fillRect(-140, -140, 280, 280)
+    ctx.strokeStyle = 'rgba(60,30,10,0.45)'; ctx.lineWidth = 0.45
+    for (const dx of [0.6, 2.4]) {
+      ctx.beginPath()
+      ctx.moveTo(pawPt[0] + dx + Math.cos(rot) * 2.4, pawPt[1] + Math.sin(rot) * 2.4 - 1)
+      ctx.lineTo(pawPt[0] + dx + Math.cos(rot) * 3.2, pawPt[1] + Math.sin(rot) * 3.2 + 0.4)
+      ctx.stroke()
+    }
   }
-  const ao = ctx.createRadialGradient(...P(L * 0.5, -16), 2, ...P(L * 0.5, -16), L * 0.7)
-  ao.addColorStop(0, 'rgba(40,15,0,0.28)'); ao.addColorStop(1, 'rgba(40,15,0,0)')
-  ctx.fillStyle = ao; ctx.fillRect(-120, -120, 240, 240)
-  ctx.restore()
-  ctx.strokeStyle = 'rgba(40,15,0,0.22)'; ctx.lineWidth = 0.8
-  smooth(ctx, pts); ctx.stroke()
+  const tuck = p.tuck >= 0.5
+  const farG = !tuck ? legGeo(true) : null
+  const nearG = !tuck ? legGeo(false) : null
 
-  if (!tailBehind) tailDraw()
-
-  if (p.tuck >= 0.5) {
-    ctx.fillStyle = F.light; ellipse(ctx, sh[0] + 7, -1.8, 4.6, 2.2)
-    ball(ctx, hip[0] + 2, -3.5, 7, 3.6, F)
-  } else legs(false)
-
-  // neck, chest ruff and head
+  // ---- body: one silhouette, deep chest, tucked waist, round rump ----
+  const bodyPts = [P(-13.5, 2), P(-9, 11), P(-1, 11.6), P(L * 0.5, 9.8), P(L * 0.86, 11.3), P(L + 4, 9.4), P(L + 10.5, 1.4),
+    P(L + 10, -6.5), P(L + 4, -12.6), P(L * 0.62, -11.4), P(L * 0.32, -10.6), P(2, -11.6), P(-9, -7.4)]
+  const body = through(new Path2D(), bodyPts, true)
   const hc = [sh[0] + p.head[0] + (s.headPush || 0), sh[1] + p.head[1] + br * 0.4 + (s.headPush || 0) * 0.3]
-  capsule(ctx, P(L + 2, 3), hc, 15, 12, [F.lit, F.base, F.dark])
-  ctx.fillStyle = F.light
-  capsule(ctx, P(L + 6, -6), [hc[0] + 1, hc[1] + 5], 8, 7)
+  const neck = taper([P(L - 2, 4), P(L + 4, 6), [hc[0] - 2, hc[1] + 3]], [17, 15, 12])
+  // the ruff of longer fur on the chest
+  const ruffPts = []
+  for (let i = 0; i <= 10; i++) {
+    const a = -0.4 + (i / 10) * 1.9
+    const r = 7.2 + (i % 2) * 0.9
+    const c = P(L + 5, -4.5)
+    ruffPts.push([c[0] + Math.cos(a) * r * u[0] - Math.sin(a) * r * n[0], c[1] + Math.cos(a) * r * u[1] - Math.sin(a) * r * n[1]])
+  }
+  const ruff = through(new Path2D(), [P(L + 2, 1), ...ruffPts, P(L, -9)], true)
 
-  const face = F.flat ? ((s.face || 0) > 0.5 ? 1 : 0) : s.face || 0
+  const bodyDetail = () => {
+    // one light over the whole animal: back in shade, flank lit, belly pale
+    const g = ctx.createLinearGradient(...P(L / 2, 15), ...P(L / 2, -15))
+    g.addColorStop(0, F.dark); g.addColorStop(0.28, F.base); g.addColorStop(0.7, F.base); g.addColorStop(1, F.light)
+    ctx.fillStyle = g; ctx.fillRect(-140, -140, 280, 280)
+    radial(ctx, ...P(L * 0.82, 6), 15, F.hi, F.hiA) // shoulder
+    radial(ctx, ...P(-1, 5), 14, F.hi, F.hiA) // haunch
+    radial(ctx, ...P(L + 6, -5), 10, F.cream, F.creamA) // chest
+    radial(ctx, ...P(L * 0.5, -17), L * 0.75, 'rgba(40,15,0,0.26)', 'rgba(40,15,0,0)') // under the belly
+    // tabby stripes: brush strokes down from the spine, thick at the top, fading out
+    ctx.fillStyle = F.stripeS
+    for (let i = 0; i < 7; i++) {
+      const a = -8 + (i * (L + 10)) / 6.4
+      const len = i % 2 ? 9 : 12
+      ctx.fill(taper([P(a + 1, 12.5), P(a + 2.6, 8), P(a + 1.2, 12.5 - len)], [3.4, 2.4, 0.3]))
+    }
+    // fur texture
+    ctx.lineWidth = 0.5; ctx.lineCap = 'round'
+    for (const [fa, fb, fl, fj, light] of FLICKS) {
+      const q = P(-8 + fa * (L + 14), fb * 9)
+      const ang = Math.atan2(-u[1], -u[0]) + 0.5 + fj
+      ctx.strokeStyle = light ? 'rgba(255,238,218,0.2)' : 'rgba(70,30,5,0.16)'
+      ctx.beginPath(); ctx.moveTo(q[0], q[1]); ctx.lineTo(q[0] + Math.cos(ang) * fl, q[1] + Math.sin(ang) * fl); ctx.stroke()
+    }
+  }
+  const legDetail = (g, top) => () => {
+    // the body's own light runs on down the leg, then the fur pales towards the paw
+    bodyDetail()
+    const lg = ctx.createLinearGradient(0, top * 0.45, 0, 0)
+    lg.addColorStop(0, F.creamA); lg.addColorStop(1, F.cream)
+    ctx.fillStyle = lg; ctx.fillRect(-140, -140, 280, 280)
+    // a few rings round the legs, and the line of the thigh muscle
+    ctx.fillStyle = F.stripeS
+    for (const [a, b] of [[g.knee, g.hock], [g.elbow, g.wrist]]) {
+      for (const k of [0.25, 0.6]) {
+        const q = lerp2(a, b, k), dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1
+        const nx = -dy / l, ny = dx / l
+        ctx.fill(taper([[q[0] + nx * 4, q[1] + ny * 4], q, [q[0] - nx * 4, q[1] - ny * 4]], [1.6, 2, 1.6]))
+      }
+    }
+    radial(ctx, g.hp[0] + 1, g.hp[1] - 2, 11, F.hi, F.hiA)
+  }
+
+  // ---- draw: far legs, tail if behind, body with near legs, tail if in front, head ----
+  if (farG) {
+    layer(ctx, [[farG.hind], [farG.front], [farG.hindPaw], [farG.frontPaw]], F.far, line, 1.3)
+  }
+  const tailBehind = p.tail[0] > -0.2
+  if (tailBehind) layer(ctx, [[tailPath, tailDetail]], F.base, line, 1.4)
+
+  const parts = [[body, bodyDetail], [neck, bodyDetail], [ruff, bodyDetail]]
+  // sitting or lying, the thigh bunches into a round haunch
+  const hs = Math.max(0, Math.min(1, (hip[1] + 21) / 8)) * (1 - p.gait)
+  if (hs > 0.05 && !tuck) parts.push([ell(hip[0] + 2, hip[1] + 1 - hs, 8 + hs * 5, 6 + hs * 4.5, Math.atan2(u[1], u[0]) * 0.5), () => { bodyDetail(); radial(ctx, hip[0] + 4, hip[1] - 3, 10, F.hi, F.hiA) }])
+  if (nearG) {
+    parts.push([nearG.hind, legDetail(nearG, -30)], [nearG.front, legDetail(nearG, -34)])
+    parts.push([nearG.hindPaw, pawDetail(nearG.pawH, 0)], [nearG.frontPaw, pawDetail(nearG.wrist, nearG.raised ? -0.6 : 0)])
+  } else {
+    // loafing: paws tucked under the chest, haunch rounded
+    parts.push([ell(sh[0] + 7, -2, 4.8, 2.3), pawDetail([sh[0] + 5, -2], 0)], [ell(hip[0] + 2, -4, 8, 4.2), bodyDetail])
+  }
+  layer(ctx, parts, F.base, line, 1.5)
+  // inner contours: where a near leg or the haunch lies over the body, a soft line keeps it readable
+  ctx.save()
+  ctx.strokeStyle = s.dark ? 'rgba(40,14,0,0.55)' : 'rgba(70,28,6,0.5)'; ctx.lineWidth = 0.9; ctx.lineJoin = 'round'
+  if (hs > 0.05 && !tuck) {
+    ctx.beginPath(); ctx.ellipse(hip[0] + 2, hip[1] + 1 - hs, 8 + hs * 5, 6 + hs * 4.5, Math.atan2(u[1], u[0]) * 0.5, -0.5, 1.9); ctx.stroke()
+  }
+  if (nearG) {
+    const cp = new Path2D(); cp.rect(-600, -600, 1200, 1200)
+    cp.arc(nearG.hp[0], nearG.hp[1] - 2, 10, 0, Math.PI * 2)
+    cp.moveTo(sh[0] + 6, sh[1] + 1); cp.arc(sh[0] - 1, sh[1] + 1, 7, 0, Math.PI * 2)
+    ctx.clip(cp, 'evenodd')
+    ctx.stroke(nearG.hind); ctx.stroke(nearG.front)
+  }
+  ctx.restore()
+  if (nearG) {
+    // the crease where the thigh meets the belly, and the elbow
+    ctx.strokeStyle = 'rgba(70,30,5,0.3)'; ctx.lineWidth = 0.7; ctx.lineCap = 'round'
+    const k = nearG.knee, h = nearG.hp
+    ctx.beginPath(); ctx.moveTo(h[0] + 7, h[1] - 3); ctx.quadraticCurveTo(k[0] + 5, (h[1] + k[1]) / 2, k[0] + 2.5, k[1] - 0.5); ctx.stroke()
+    if (s.claws && nearG.raised) {
+      // claws out
+      // claws out: little hooks fanned from the toes, along the line of the forearm
+      const w = nearG.wrist, e = nearG.elbow
+      const a = Math.atan2(w[1] - e[1], w[0] - e[0])
+      ctx.save(); ctx.translate(w[0] + Math.cos(a) * 1.9, w[1] + Math.sin(a) * 1.9); ctx.rotate(a)
+      ctx.fillStyle = '#fbf7f0'; ctx.strokeStyle = 'rgba(70,40,20,0.55)'; ctx.lineWidth = 0.3
+      for (const k of [-1, -0.33, 0.33, 1]) {
+        ctx.save(); ctx.translate(3.9, k * 2); ctx.rotate(k * 0.35 * s.claws)
+        const L2 = 2.6 * s.claws
+        ctx.beginPath(); ctx.moveTo(0, -0.45); ctx.quadraticCurveTo(L2 * 0.8, -0.6, L2, 0.9); ctx.quadraticCurveTo(L2 * 0.55, 0.1, 0, 0.45); ctx.closePath(); ctx.fill(); ctx.stroke()
+        ctx.restore()
+      }
+      ctx.restore()
+    }
+  }
+  if (!tailBehind) layer(ctx, [[tailPath, tailDetail]], F.base, line, 1.4, tailHole)
+
+  // ---- head ----
+  const face = s.face || 0
   ctx.save()
   ctx.translate(hc[0], hc[1])
   ctx.rotate(p.tilt + (s.headTilt || 0))
-  if (face < 1) { ctx.save(); ctx.globalAlpha = 1 - face; sideHead(ctx, s, F, p); ctx.restore() }
+  if (s.headScale) ctx.scale(s.headScale, 1) // keeps the head full width while the body swings round
+  if (face < 1) { ctx.save(); ctx.globalAlpha = 1 - face; sideHead(ctx, s, F, p, line); ctx.restore() }
   if (face > 0) {
     ctx.save(); ctx.globalAlpha = face
     ctx.translate(2.5 * face, 0)
     if (s.dir < 0) ctx.scale(-1, 1) // keep the face the right way round when the body is mirrored
-    frontHead(ctx, s, F, p)
+    frontHead(ctx, s, F, p, line)
     ctx.restore()
   }
   ctx.restore()

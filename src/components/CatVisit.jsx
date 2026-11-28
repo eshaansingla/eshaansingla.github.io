@@ -250,7 +250,7 @@ export default function CatVisit() {
         leaveAt: coarse ? rnd(55, 90) : rnd(150, 260), friend: tally.tamedAll > 0, greeted: false,
         glance: null, glanceAt: 0, sleepy: h >= 22 || h < 6, wideT: 0, followUntil: 0, wiggle: false,
         paw: null, paw2: null, headPush: 0, tailHook: 0, nearSince: 0, yarnDone: false,
-        dirVis: L.side < 0 ? 1 : -1, squashT: 0, petRun: 0, petGap: 0, lastInteract: 0, groomMode: 'paw', peekT: 0, pupilNow: 0.5,
+        dirVis: L.side < 0 ? 1 : -1, th: L.side < 0 ? 0 : Math.PI, thV: 0, squashT: 0, petRun: 0, petGap: 0, lastInteract: 0, groomMode: 'paw', peekT: 0, pupilNow: 0.5,
       }
       setTally({ present: true, visits: tally.visits + 1 })
       wrap.current.style.display = 'block'
@@ -440,7 +440,7 @@ export default function CatVisit() {
 
       // ---------- behaviour ----------
       let pose = 'sit'
-      c.paw = null; c.paw2 = null
+      c.paw = null; c.paw2 = null; c.claws = 0
       switch (c.state) {
         case 'walk':
           pose = 'walk'
@@ -553,15 +553,27 @@ export default function CatVisit() {
           // a quick bat at the pointer, sometimes a one-two
           pose = 'sit'
           const k = c.st / c.dur
-          const reachK = Math.sin(clamp(k, 0, 1) * Math.PI)
           const sh = c.p.sh
           const tgt = lp ? [clamp(lp[0], sh[0] + 2, sh[0] + 30), clamp(lp[1], sh[1] - 18, -4)] : [sh[0] + 20, sh[1]]
           const rest = [sh[0] + 6, -2]
-          c.paw = [rest[0] + (tgt[0] - rest[0]) * reachK, rest[1] + (tgt[1] - rest[1]) * reachK]
-          if (c.two && k > 0.45) {
-            const k2 = Math.sin(clamp((k - 0.45) / 0.55, 0, 1) * Math.PI)
-            c.paw2 = [rest[0] + (tgt[0] - rest[0]) * k2, rest[1] + (tgt[1] - rest[1]) * k2]
+          // a real bat: the paw comes up beside the chest, hooks over and out at the target with the claws
+          // showing, and draws back down
+          const strike = (q) => {
+            const up = [sh[0] + 9, sh[1] + 4]
+            if (q < 0.28) { const e = smooth01(q / 0.28); return [[rest[0] + (up[0] - rest[0]) * e, rest[1] + (up[1] - rest[1]) * e], 0] }
+            if (q < 0.55) {
+              const e = smooth01((q - 0.28) / 0.27), m = 1 - e
+              const ctl = [(up[0] + tgt[0]) / 2, Math.min(up[1], tgt[1]) - 10]
+              const over = 1 + Math.sin(e * Math.PI) * 0.08
+              return [[m * m * up[0] + 2 * m * e * ctl[0] + e * e * tgt[0] * over - (over - 1) * sh[0], m * m * up[1] + 2 * m * e * ctl[1] + e * e * tgt[1]], smooth01(e * 1.6)]
+            }
+            const e = smooth01((q - 0.55) / 0.45)
+            return [[tgt[0] + (rest[0] - tgt[0]) * e, tgt[1] + (rest[1] - tgt[1]) * e - Math.sin(e * Math.PI) * 3], 1 - smooth01(e * 1.8)]
           }
+          const [p1, cl] = strike(clamp(k, 0, 1))
+          c.paw = p1; c.claws = cl
+          if (c.two && k > 0.45) c.paw2 = strike(clamp((k - 0.45) / 0.55, 0, 1))[0]
+          c.earBackT = 0.15
           c.wideT = 0.3
           if (c.st > c.dur * (c.two ? 1.5 : 1)) go('sit')
           break
@@ -574,6 +586,7 @@ export default function CatVisit() {
           const a = Math.sin(c.st * 11), b = Math.sin(c.st * 11 + Math.PI)
           c.paw = [sh[0] + 8 + (tgt[0] - sh[0] - 8) * Math.max(0, a), sh[1] + 10 + (tgt[1] - sh[1] - 10) * Math.max(0, a)]
           c.paw2 = [sh[0] + 6 + (tgt[0] - sh[0] - 6) * Math.max(0, b), sh[1] + 12 + (tgt[1] - sh[1] - 12) * Math.max(0, b)]
+          c.claws = clamp((a - 0.5) * 3, 0, 1)
           c.wideT = 0.3
           if (c.st > c.dur) go('sit')
           break
@@ -833,9 +846,22 @@ export default function CatVisit() {
       const tiltClick = c.tiltT > 0 ? Math.sin(Math.min(1, (1.3 - c.tiltT) / 0.25) * Math.PI * 0.5) * 0.3 * c.tiltDir * Math.min(1, c.tiltT / 0.3) : 0
       const tiltLook = c.face > 0.5 ? c.look[0] * c.dir * 0.08 : 0
       const shake = c.shakeT > 0 ? Math.sin(c.shakeT * 70) * 0.18 * (c.shakeT / 0.45) : 0
-      // turning round is a quick swing, not a flip
-      c.dirVis += (c.dir - c.dirVis) * Math.min(1, dt * 13)
-      const turn = Math.abs(c.dirVis) < 0.18 ? 0.18 * Math.sign(c.dirVis || c.dir) : c.dirVis
+      // turning round: she swings about her own middle, her body foreshortening while her head stays
+      // full size and comes round to face us halfway, the way a cat turns. th is the angle she is facing:
+      // 0 is right, pi is left. A spin keeps going the same way round
+      {
+        const par = c.dir > 0 ? 0 : 1
+        let goal
+        if (c.state === 'spin') { goal = Math.ceil((c.th - 0.05 - par * Math.PI) / (2 * Math.PI)) * 2 * Math.PI + par * Math.PI }
+        else { goal = Math.round((c.th - par * Math.PI) / (2 * Math.PI)) * 2 * Math.PI + par * Math.PI }
+        const w = c.state === 'spin' ? 17 : 12
+        c.thV += (w * w * (goal - c.th) - 2 * w * c.thV) * Math.min(dt, 0.05)
+        c.th += c.thV * Math.min(dt, 0.05)
+        if (Math.abs(goal - c.th) < 0.002 && Math.abs(c.thV) < 0.05) { c.th = goal % (2 * Math.PI); c.thV = 0 }
+        c.dirVis = Math.cos(c.th)
+      }
+      const turnSide = 1 - Math.abs(c.dirVis)
+      const turn = (Math.sign(c.dirVis) || c.dir) * Math.max(0.4, Math.abs(c.dirVis))
       c.squashT = Math.max(0, c.squashT - dt)
       const sq = c.squashT > 0 ? Math.sin((c.squashT / 0.22) * Math.PI) * 0.07 : 0
       // cats' pupils open wide in the dark
@@ -866,7 +892,8 @@ export default function CatVisit() {
         : [POSES.sit.sh[0] + 13 + Math.sin(c.t * 9) * 1.5, POSES.sit.sh[1] - 4]
       const box = drawCat(ctx, {
         pose: c.p, cyc: pose === 'jump' ? 0.3 : c.cyc, gaitKind: pose === 'run' || pose === 'jump' ? 'run' : 'walk', t: c.t,
-        palette, dark, dir: Math.sign(turn), face: c.face, look: c.look, blink,
+        palette, dark, dir: Math.sign(turn), face: Math.max(c.face, smooth01(turnSide * 1.6)), look: c.look, blink,
+        headScale: Math.min(2.5, 1 / Math.abs(turn)) * (1 - turnSide * 0.06), claws: c.claws || 0,
         pupil: c.pupilNow,
         breath: ['sit', 'loaf', 'lie', 'scratch', 'groom'].includes(pose) ? (pose === 'loaf' ? 1.6 : 0.8) : 0, purr: c.purrT > 0,
         groom: groomAt || c.paw, paw2: c.paw2, scratch: scratchAt, swish: c.swish, flick: (c.state === 'mock' && c.mock === 'back') || c.state === 'annoyed',
@@ -876,7 +903,7 @@ export default function CatVisit() {
 
       // hearts, z's and marks, the right way round above her head
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      const hx = ox + (box.head ? box.head[0] : 10) * K * c.dir
+      const hx = ox + (box.head ? box.head[0] : 10) * K * turn
       const hy = oy + (box.head ? box.head[1] : -50) * K - lift
       c.headAt = [c.x - ox + hx, floor - oy + hy]
       c.fx = c.fx.filter((f) => {

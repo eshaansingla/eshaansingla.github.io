@@ -354,7 +354,7 @@ export function drawCat(ctx, s) {
   // it keeps turning but flat on the floor, round her and towards us, which side-on reads as the tail
   // wrapping round in front of her feet (lower on the page the nearer it comes). The tip lifts off the floor
   const tail = [P(-6.5, 5.5)], depth = [0]
-  let fl = null, prevA = 0
+  let fl = null, prevA = 0, touch = -1
   for (let i = 1; i <= 15; i++) {
     const k = i / 15
     const a = back + lift0 + curl * i + amp * Math.sin(t * (s.flick ? 9 : 2.2) - i * 0.42) * (0.3 + k)
@@ -366,7 +366,7 @@ export function drawCat(ctx, s) {
         const dy = -2.3 - prev[1]
         const dirX = Math.cos(a) >= 0 ? 1 : -1
         tx = prev[0] + dirX * Math.sqrt(Math.max(0, 16.81 - dy * dy)); ty = -2.3
-        fl = { phi: dirX > 0 ? 0 : Math.PI, x: tx, z: 0, left: dirX < 0, turn: 0, wave: 0 }
+        fl = { phi: dirX > 0 ? 0 : Math.PI, x: tx, z: 0, left: dirX < 0, turn: 0, wave: 0 }; touch = i
       }
       tail.push([tx, ty]); depth.push(0)
     } else {
@@ -387,10 +387,11 @@ export function drawCat(ctx, s) {
   // wrapped round in front of her, the tail still grows from behind: the part before it reaches the
   // floor is drawn behind the body, the rest in front
   // the part that has come round in front of her is drawn over her; the rest, behind
-  let wrapAt = depth.findIndex((z) => z > 1.5)
+  // once it comes round towards us, all of it from where it meets the floor lies in front of her legs
+  let wrapAt = depth.some((z) => z > 1.5) ? touch : -1
   const tailBehind = wrapAt < 0
   if (tailBehind) wrapAt = 4
-  wrapAt = Math.max(2, Math.min(13, wrapAt - 1))
+  wrapAt = Math.max(2, Math.min(13, wrapAt))
   const tailBackPath = taper(tail.slice(0, wrapAt + 2), tw.slice(0, wrapAt + 2), new Path2D(), true)
   const tailFrontPath = taper(tail.slice(wrapAt), tw.slice(wrapAt), new Path2D(), true)
   const tailHole = [tail[wrapAt][0], tail[wrapAt][1], tw[wrapAt] / 2 + 1.2]

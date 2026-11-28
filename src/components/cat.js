@@ -106,6 +106,7 @@ function taper(pts, w, path = new Path2D(), capStart = false) {
   return path
 }
 
+const rgbaZero = 'rgba(0,0,0,0)'
 const ell = (x, y, rx, ry, rot = 0, path = new Path2D()) => { path.moveTo(x + rx * Math.cos(rot), y + rx * Math.sin(rot)); path.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); return path }
 
 function radial(ctx, x, y, r, c0, c1, r0 = 0) {
@@ -343,7 +344,7 @@ export function drawCat(ctx, s) {
   // ---- tail: a fluffy taper along the chain; along the floor it lies on the ground ----
   const back = Math.atan2(-u[1], -u[0])
   const [lift0, curl, amp] = p.tail
-  const tail = [P(-9, 7)]
+  const tail = [P(-6.5, 5.5)]
   for (let i = 1; i <= 15; i++) {
     const k = i / 15
     const a = back + lift0 + curl * i + amp * Math.sin(t * (s.flick ? 9 : 2.2) - i * 0.42) * (0.3 + k)
@@ -356,55 +357,93 @@ export function drawCat(ctx, s) {
     }
     tail.push([tx, ty])
   }
-  const tw = tail.map((_, i) => { const k = i / 15; return lerp(9.2, 4.6, k) * (1 + 0.14 * Math.sin(k * Math.PI)) })
+  // thick where it grows out of the rump, then a long even plume to a rounded tip
+  const tw = tail.map((_, i) => { const k = i / 15; return 4.8 + 6.4 * Math.pow(1 - k, 2.2) + 0.9 * Math.sin(k * Math.PI) })
   const tailPath = taper(tail, tw, new Path2D(), true)
-  const tailHole = [tail[0][0], tail[0][1], 5.6]
+  // wrapped round in front of her, the tail still grows from behind: the part before it reaches the
+  // floor is drawn behind the body, the rest in front
+  let wrapAt = tail.findIndex((q, i) => i > 1 && q[1] >= -2.31)
+  if (wrapAt < 0 || wrapAt > 9) wrapAt = 4
+  const tailBackPath = taper(tail.slice(0, wrapAt + 2), tw.slice(0, wrapAt + 2), new Path2D(), true)
+  const tailFrontPath = taper(tail.slice(wrapAt), tw.slice(wrapAt), new Path2D(), true)
+  const tailHole = [tail[wrapAt][0], tail[wrapAt][1], tw[wrapAt] / 2 + 1.2]
+  // the tail is furred and lit like the rest of her: darker along its top, pale underneath like her
+  // belly, tabby rings brushed down from the top that fade before the underside, and the same fur flicks
+  const tailUp = tail.map((q, i) => {
+    const a = tail[Math.max(0, i - 1)], b = tail[Math.min(15, i + 1)]
+    const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1
+    let nx = -dy / l, ny = dx / l
+    if (ny > 0 || (ny === 0 && nx > 0)) { nx = -nx; ny = -ny } // the side facing up
+    return [nx, ny]
+  })
+  const tailOff = (k) => tail.map((q, i) => [q[0] + tailUp[i][0] * tw[i] * k, q[1] + tailUp[i][1] * tw[i] * k])
   const tailDetail = () => {
-    const g = ctx.createLinearGradient(tail[0][0], tail[0][1] - 6, tail[0][0], tail[0][1] + 6)
-    g.addColorStop(0, F.base); g.addColorStop(1, F.dark)
     ctx.fillStyle = F.base; ctx.fillRect(-140, -140, 280, 280)
-    // rings, darker towards the tip, and a dark tip
+    ctx.fillStyle = F.light; ctx.globalAlpha = 0.55; ctx.fill(taper(tailOff(-0.34), tw.map((w) => w * 0.5))); ctx.globalAlpha = 1
+    ctx.fillStyle = F.dark; ctx.globalAlpha = 0.6; ctx.fill(taper(tailOff(0.36), tw.map((w) => w * 0.4))); ctx.globalAlpha = 1
+    radial(ctx, ...tail[4], 9, F.hi, F.hiA)
+    // rings: brush strokes from the top edge down, like the stripes on her back
     ctx.fillStyle = F.stripeS
-    for (let i = 3; i < 15; i += 2) {
-      const a = tail[i], b = tail[i + 1] || a
-      const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1
-      const nx = -dy / l, ny = dx / l, h = tw[i] / 2 + 1
-      ctx.fill(taper([[a[0] + nx * h, a[1] + ny * h], [a[0] + dx * 0.3, a[1] + dy * 0.3], [a[0] - nx * h, a[1] - ny * h]], [2.2, 2.6, 2.2]))
+    for (let i = 2; i < 15; i += 2) {
+      const q = tail[i], [ux, uy] = tailUp[i], h = tw[i] / 2
+      const along = [tail[i + 1][0] - q[0], tail[i + 1][1] - q[1]]
+      ctx.fill(taper([[q[0] + ux * (h + 1), q[1] + uy * (h + 1)], [q[0] + along[0] * 0.15, q[1] + along[1] * 0.15], [q[0] - ux * h * 0.55 + along[0] * 0.3, q[1] - uy * h * 0.55 + along[1] * 0.3]], [2.8 + h * 0.2, 2, 0.3]))
     }
-    radial(ctx, ...tail[15], 6, F.stripeS, 'rgba(0,0,0,0)')
-    // fur along the tail
-    ctx.strokeStyle = 'rgba(255,236,214,0.1)'; ctx.lineWidth = 0.4
-    for (let i = 1; i < 15; i++) { const a = tail[i]; ctx.beginPath(); ctx.moveTo(a[0], a[1] - tw[i] * 0.25); ctx.lineTo(tail[i + 1][0], tail[i + 1][1] - tw[i] * 0.3); ctx.stroke() }
+    radial(ctx, ...tail[15], 5, F.stripeS, rgbaZero)
+    // fur flicks pointing back along the tail
+    ctx.lineWidth = 0.45; ctx.lineCap = 'round'
+    for (let i = 1; i < 15; i++) {
+      const q = tail[i], n2 = tail[i + 1], [ux, uy] = tailUp[i]
+      for (const [k, lightF] of [[0.3, false], [-0.15, true], [-0.4, true]]) {
+        const x = q[0] + ux * tw[i] * k, y = q[1] + uy * tw[i] * k
+        ctx.strokeStyle = lightF ? 'rgba(255,238,218,0.22)' : 'rgba(70,30,5,0.18)'
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (n2[0] - q[0]) * 0.55 - ux * 0.6, y + (n2[1] - q[1]) * 0.55 - uy * 0.6); ctx.stroke()
+      }
+    }
+    // where it leaves the body it takes on the body's own light
+    radial(ctx, ...tail[0], 9, F.base, rgbaZero)
   }
 
   // ---- legs: tapered from a full thigh or shoulder to a slim ankle, ending in a toed paw ----
+  // how far through its swing a foot is (0 planted, 1 at the top of its step)
+  const swingOf = (leg) => p.gait * Math.max(0, Math.min(1, -gaitFoot(leg)[1] / lift))
+  const rot = ([x, y], a) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)]
+  const lowSh = Math.max(0, Math.min(1, (sh[1] + 20) / 6)) * (1 - p.gait) // lying or loafing: forearms flat
   const legGeo = (far) => {
     const fl = far ? 'rf' : 'lf', hl = far ? 'rh' : 'lh'
     const off = far ? 2.6 : 0
-    // hind
+    // hind: hip, the knee forward, the hock back, the long foot down to the paw. Mid-step the foot
+    // folds back under the hock and the paw trails
     const scratching = s.scratch && !far
     const hp = [hip[0] + off, hip[1] + 1]
+    const sw = swingOf(hl)
     const pawH = scratching ? s.scratch.slice() : foot(hl); pawH[0] += off
-    const hock = scratching ? [pawH[0] - 9, pawH[1] + 7] : [pawH[0] + p.mt[0], pawH[1] + p.mt[1]]
+    const mt = rot(p.mt, sw * 0.65)
+    const hock = scratching ? [pawH[0] - 9, pawH[1] + 7] : [pawH[0] + mt[0], pawH[1] + mt[1]]
     const [knee] = ik(hp, hock, 15, 14, scratching ? -1 : 1)
     if (knee[1] > -2.5) knee[1] = -2.5
-    const hind = taper([[hp[0] - 2, hp[1] - 3], hp, knee, hock, pawH], far ? [14, 13, 7, 4.6, 4.2] : [16, 15.5, 7.6, 4.8, 4.4])
-    const hindPaw = ell(pawH[0] + 1.8, pawH[1] - 1.9, 4.3, 2.5, 0)
-    // front
+    const hind = taper([[hp[0] - 2, hp[1] - 3], hp, knee, hock, pawH], far ? [14, 13, 7.6, 5, 4.6] : [16, 15.5, 8.4, 5.6, 5])
+    const pr = sw * 0.5
+    const hindPaw = ell(pawH[0] + Math.cos(pr) * 1.8, pawH[1] - 1.9 + Math.sin(pr) * 1.8, 4.5, 2.7, pr)
+    // front: shoulder, the elbow tucked back against the chest, a long straight forearm, the wrist.
+    // Mid-step the wrist lifts and the paw curls back under it
     const spt = [sh[0] + off - 1, sh[1] + 3]
+    const fsw = swingOf(fl)
     const pawF = foot(fl); pawF[0] += off
     const raised = (s.groom && !far) || (s.paw2 && far)
-    const target = raised ? (far ? [s.paw2[0] - off, s.paw2[1]] : s.groom) : [pawF[0] - 1, pawF[1] - 2.2]
-    const [elbow, wrist] = ik(spt, target, 15.5, 15, raised ? -1 : 1)
-    if (elbow[1] > -3) elbow[1] = -3 // lying down, the forearm rests on the floor
-    const front = taper([[spt[0], spt[1] - 4], spt, elbow, wrist], far ? [10, 10, 6, 4.3] : [12, 11.5, 6.4, 4.5])
+    let target = raised ? (far ? [s.paw2[0] - off, s.paw2[1]] : s.groom) : [pawF[0] - 1 - fsw * 1.5, pawF[1] - 2.2 - fsw * 2.2]
+    // of the two ways the elbow can bend, a cat's is the lower one, behind
+    const A = ik(spt, target, 10.5, 19, 1), B = ik(spt, target, 10.5, 19, -1)
+    let [elbow, wrist] = raised ? (A[0][1] > B[0][1] ? A : B) : (A[0][0] < B[0][0] ? A : B)
+    if (lowSh > 0) elbow = lerp2(elbow, [wrist[0] - 17, -3.4], lowSh)
+    if (elbow[1] > -3) elbow = [elbow[0], -3]
+    const front = taper([[spt[0], spt[1] - 4], spt, elbow, wrist], far ? [10, 10, 6.6, 4.8] : [12, 11.5, 7.4, 5.2])
     // a raised paw points along the forearm and spreads its toes when the claws come out
-    const pa = raised ? Math.atan2(wrist[1] - elbow[1], wrist[0] - elbow[0]) : 0
+    const pa = raised ? Math.atan2(wrist[1] - elbow[1], wrist[0] - elbow[0]) : fsw * 1.25
     const spread = raised && !far ? (s.claws || 0) : 0
-    const frontPaw = raised
-      ? ell(wrist[0] + Math.cos(pa) * 1.9, wrist[1] + Math.sin(pa) * 1.9, 4.4 + spread * 0.5, 2.6 + spread * 0.7, pa)
-      : ell(wrist[0] + 1.9, wrist[1] + 0.5, 4.4, 2.5, 0)
-    return { hind, hindPaw, front, frontPaw, knee, hock, pawH, elbow, wrist, raised, hp }
+    const po = raised ? [Math.cos(pa) * 1.9, Math.sin(pa) * 1.9] : rot([1.9, 0.5], pa)
+    const frontPaw = ell(wrist[0] + po[0], wrist[1] + po[1], 4.6 + spread * 0.5, 2.8 + spread * 0.7, pa)
+    return { hind, hindPaw, front, frontPaw, knee, hock, pawH, elbow, wrist, raised, hp, pa, pr }
   }
   const pawDetail = (pawPt, rot) => () => {
     ctx.fillStyle = F.light; ctx.fillRect(-140, -140, 280, 280)
@@ -481,18 +520,23 @@ export function drawCat(ctx, s) {
 
   // ---- draw: far legs, tail if behind, body with near legs, tail if in front, head ----
   if (farG) {
-    layer(ctx, [[farG.hind], [farG.front], [farG.hindPaw], [farG.frontPaw]], F.far, line, 1.3)
+    const farShade = () => {
+      const g = ctx.createLinearGradient(0, -30, 0, 0)
+      g.addColorStop(0, F.far); g.addColorStop(0.6, F.far); g.addColorStop(1, F.farLit)
+      ctx.fillStyle = g; ctx.fillRect(-140, -140, 280, 280)
+    }
+    layer(ctx, [[farG.hind, farShade], [farG.front, farShade], [farG.hindPaw, farShade], [farG.frontPaw, farShade]], F.far, line, 1.3)
   }
   const tailBehind = p.tail[0] > -0.2
-  if (tailBehind) layer(ctx, [[tailPath, tailDetail]], F.base, line, 1.4)
-
-  const parts = [[body, bodyDetail], [neck, bodyDetail], [ruff, bodyDetail]]
+  // behind her, the tail is drawn in the same pass as the body, so it grows out of her with no seam
+  const parts = [[tailBehind ? tailPath : tailBackPath, tailDetail]]
+  parts.push([body, bodyDetail], [neck, bodyDetail], [ruff, bodyDetail])
   // sitting or lying, the thigh bunches into a round haunch
   const hs = Math.max(0, Math.min(1, (hip[1] + 21) / 8)) * (1 - p.gait)
   if (hs > 0.05 && !tuck) parts.push([ell(hip[0] + 2, hip[1] + 1 - hs, 8 + hs * 5, 6 + hs * 4.5, Math.atan2(u[1], u[0]) * 0.5), () => { bodyDetail(); radial(ctx, hip[0] + 4, hip[1] - 3, 10, F.hi, F.hiA) }])
   if (nearG) {
     parts.push([nearG.hind, legDetail(nearG, -30)], [nearG.front, legDetail(nearG, -34)])
-    parts.push([nearG.hindPaw, pawDetail(nearG.pawH, 0)], [nearG.frontPaw, pawDetail(nearG.wrist, nearG.raised ? -0.6 : 0)])
+    parts.push([nearG.hindPaw, pawDetail(nearG.pawH, nearG.pr)], [nearG.frontPaw, pawDetail(nearG.wrist, nearG.pa)])
   } else {
     // loafing: paws tucked under the chest, haunch rounded
     parts.push([ell(sh[0] + 7, -2, 4.8, 2.3), pawDetail([sh[0] + 5, -2], 0)], [ell(hip[0] + 2, -4, 8, 4.2), bodyDetail])
@@ -517,23 +561,26 @@ export function drawCat(ctx, s) {
     ctx.strokeStyle = 'rgba(70,30,5,0.3)'; ctx.lineWidth = 0.7; ctx.lineCap = 'round'
     const k = nearG.knee, h = nearG.hp
     ctx.beginPath(); ctx.moveTo(h[0] + 7, h[1] - 3); ctx.quadraticCurveTo(k[0] + 5, (h[1] + k[1]) / 2, k[0] + 2.5, k[1] - 0.5); ctx.stroke()
-    if (s.claws && nearG.raised) {
-      // claws out
-      // claws out: little hooks fanned from the toes, along the line of the forearm
-      const w = nearG.wrist, e = nearG.elbow
-      const a = Math.atan2(w[1] - e[1], w[0] - e[0])
-      ctx.save(); ctx.translate(w[0] + Math.cos(a) * 1.9, w[1] + Math.sin(a) * 1.9); ctx.rotate(a)
-      ctx.fillStyle = '#fbf7f0'; ctx.strokeStyle = 'rgba(70,40,20,0.55)'; ctx.lineWidth = 0.3
-      for (const k of [-1, -0.33, 0.33, 1]) {
-        ctx.save(); ctx.translate(3.9, k * 2); ctx.rotate(k * 0.35 * s.claws)
-        const L2 = 2.6 * s.claws
-        ctx.beginPath(); ctx.moveTo(0, -0.45); ctx.quadraticCurveTo(L2 * 0.8, -0.6, L2, 0.9); ctx.quadraticCurveTo(L2 * 0.55, 0.1, 0, 0.45); ctx.closePath(); ctx.fill(); ctx.stroke()
-        ctx.restore()
-      }
+  }
+  const drawClaws = () => {
+    if (!(s.claws && nearG && nearG.raised)) return
+    // claws out: little hooks fanned from the toes, along the line of the forearm
+    const w = nearG.wrist, e = nearG.elbow
+    const a = Math.atan2(w[1] - e[1], w[0] - e[0])
+    ctx.save(); ctx.translate(w[0] + Math.cos(a) * 1.9, w[1] + Math.sin(a) * 1.9); ctx.rotate(a)
+    ctx.fillStyle = '#fbf7f0'; ctx.strokeStyle = 'rgba(70,40,20,0.55)'; ctx.lineWidth = 0.3
+    for (const k of [-1, -0.33, 0.33, 1]) {
+      ctx.save(); ctx.translate(3.9, k * 2); ctx.rotate(k * 0.35 * s.claws)
+      const L2 = 2.6 * s.claws
+      ctx.beginPath(); ctx.moveTo(0, -0.45); ctx.quadraticCurveTo(L2 * 0.8, -0.6, L2, 0.9); ctx.quadraticCurveTo(L2 * 0.55, 0.1, 0, 0.45); ctx.closePath(); ctx.fill(); ctx.stroke()
       ctx.restore()
     }
+    ctx.restore()
   }
-  if (!tailBehind) layer(ctx, [[tailPath, tailDetail]], F.base, line, 1.4, tailHole)
+  // a paw raised to batting height comes up in front of her face
+  const armUp = nearG && nearG.raised && nearG.wrist[1] < hc[1] + 9
+  if (!armUp) drawClaws()
+  if (!tailBehind) layer(ctx, [[tailFrontPath, tailDetail]], F.base, line, 1.4, tailHole)
 
   // ---- head ----
   const face = s.face || 0
@@ -550,6 +597,12 @@ export function drawCat(ctx, s) {
     ctx.restore()
   }
   ctx.restore()
+
+  if (armUp) {
+    const spt = [sh[0] - 1, sh[1] + 3]
+    layer(ctx, [[nearG.front, legDetail(nearG, -34)], [nearG.frontPaw, pawDetail(nearG.wrist, nearG.pa)]], F.base, line, 1.4, [spt[0], spt[1], 7])
+    drawClaws()
+  }
 
   const xs = [hip[0] - 14, sh[0] + 12, hc[0] + 14], ys = [Math.min(hip[1], sh[1]) - 12, hc[1] - 20]
   return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: 0, head: hc }

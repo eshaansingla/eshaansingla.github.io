@@ -381,7 +381,14 @@ export default function CatVisit() {
     }
 
     // ---------- the frame ----------
+    // a frame that throws must never leave her frozen: settle her and carry on
     const frame = (now) => {
+      try { step(now) } catch (err) {
+        console.error(err)
+        if (cat) { try { go('sit') } catch { /* nothing more to do */ } raf = requestAnimationFrame(frame) } else raf = 0
+      }
+    }
+    const step = (now) => {
       const dt = Math.min(0.05, (now - prev) / 1000) * timeScale
       prev = now
       if (!cat) { raf = 0; return }
@@ -440,7 +447,7 @@ export default function CatVisit() {
 
       // ---------- behaviour ----------
       let pose = 'sit'
-      c.paw = null; c.paw2 = null; c.claws = 0
+      c.paw = null; c.paw2 = null; c.claws = 0; c.lean = 0
       switch (c.state) {
         case 'walk':
           pose = 'walk'
@@ -559,7 +566,7 @@ export default function CatVisit() {
           // a real bat: the paw comes up beside the chest, hooks over and out at the target with the claws
           // showing, and draws back down
           const strike = (q) => {
-            const up = [sh[0] + 9, sh[1] + 4]
+            const up = [sh[0] + 12, sh[1] - 1]
             if (q < 0.28) { const e = smooth01(q / 0.28); return [[rest[0] + (up[0] - rest[0]) * e, rest[1] + (up[1] - rest[1]) * e], 0] }
             if (q < 0.55) {
               const e = smooth01((q - 0.28) / 0.27), m = 1 - e
@@ -572,6 +579,7 @@ export default function CatVisit() {
           }
           const [p1, cl] = strike(clamp(k, 0, 1))
           c.paw = p1; c.claws = cl
+          c.lean = Math.sin(clamp(k, 0, 1) * Math.PI) // she rises and leans into it
           if (c.two && k > 0.45) c.paw2 = strike(clamp((k - 0.45) / 0.55, 0, 1))[0]
           c.earBackT = 0.15
           c.wideT = 0.3
@@ -649,6 +657,7 @@ export default function CatVisit() {
         case 'zoom':
           // a sudden fit of zoomies across her patch
           pose = 'run'
+          if (!c.legs) c.legs = [L.x1, L.x0], c.leg = c.leg || 0
           c.goal = c.legs[c.leg]
           c.speed = 300
           move(() => {
@@ -831,6 +840,7 @@ export default function CatVisit() {
         eye: pose === 'loaf' ? (c.peekT > 0 ? 0.45 : 0) : pose === 'stretch' ? 0.25 : pose === 'groom' ? 0.3 : 1,
       }
       if (c.earBackT > 0) target.ear = 0.9
+      if (c.state === 'swat' && c.lean) { target.sh = [base.sh[0] + c.lean * 3, base.sh[1] - c.lean * 3]; target.head = [base.head[0] - c.lean * 1.5, base.head[1] + c.lean] }
       if (pose === 'crouch' && c.wiggle) target.hip = [base.hip[0] + Math.sin(c.t * 22) * 1.6, base.hip[1]]
       if (pose === 'groom') target.tilt = c.groomMode === 'chest' ? 0.75 + Math.sin(c.t * 8) * 0.07 : c.groomMode === 'face' ? 0.15 + Math.sin(c.t * 5) * 0.12 : 0.45 + Math.sin(c.t * 9) * 0.06
       if (pose === 'scratch') target.tilt = 0.32

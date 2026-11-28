@@ -8,7 +8,7 @@ const ITEMS = [
   { id: 'sanchaalan', n: '1.3', name: 'Sanchaalan Saathi', value: 'live', what: 'NGO coordination platform', glyph: 'pin' },
   { id: 'lpd', n: '1.4', name: 'License-plate detection', value: '−30%', what: 'low-light false positives', glyph: 'plate' },
   { id: 'aether', n: '1.5', name: 'AETHER', value: '0.761', what: 'best ROUGE-L, greedy decoding', glyph: 'bars' },
-  { id: 'nyaaya', n: '1.6', name: 'NyaayaBot', value: '1,200+', what: 'tenancy-law queries handled', glyph: 'section' },
+  { id: 'nyaaya', n: '1.6', name: 'NyaayaBot', value: '1,200+', what: 'tenancy-law queries handled', glyph: 'scales' },
 ]
 const INTERN = { id: 'experience', n: '2.1', name: 'Research intern, ELC Thapar', value: '91%', what: 'multimodal Parkinson’s classification accuracy', glyph: 'tremor' }
 
@@ -21,7 +21,7 @@ function Glyph({ kind }) {
       {kind === 'pin' && <g {...p}><path d="M16 18s-6-6-6-10a6 6 0 0 1 12 0c0 4-6 10-6 10z" /><circle cx="16" cy="8" r="2" /><path d="M2 18h8M22 18h8" /></g>}
       {kind === 'plate' && <g {...p}><rect x="3" y="4" width="26" height="12" rx="2" /><path d="M7 8v4M10 8h2v4M15 8h2l-2 4h2M21 8v4M24 8h2v4" /></g>}
       {kind === 'bars' && <g {...p}><path d="M4 18V9M10 18V4M16 18V11M22 18V7M28 18V13" /></g>}
-      {kind === 'section' && <g {...p}><path d="M19 4c-2-2-7-1-6 2s7 3 7 6-4 4-6 2M13 8c-2 1-2 4 0 5" /><path d="M2 18h28" /></g>}
+      {kind === 'scales' && <g {...p}><circle cx="16" cy="2.4" r="1" /><path d="M16 3.4V18M11 18.5h10M6 5.2h20M6 5.2l-3 6.3M6 5.2l3 6.3M26 5.2l-3 6.3M26 5.2l3 6.3" /><path d="M2.6 11.5h6.8a3.4 3.4 0 0 1-6.8 0zM22.6 11.5h6.8a3.4 3.4 0 0 1-6.8 0z" /></g>}
       {kind === 'tremor' && <path {...p} d="M1 10c2-5 3 5 5 0s3 5 5 0 3 5 5 0 3 5 5 0 3 5 5 0 3 5 4 0" />}
     </svg>
   )

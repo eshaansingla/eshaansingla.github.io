@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { toGrid } from './asciiGrid'
+import lumaUrl from '../assets/esh-luma.png'
 
 // A small terminal that renders my photo as ASCII: it types the command, prints the portrait row by
 // row, then waits at a prompt.
 // The terminal follows the theme: white characters on dark, black on light.
 // only a small greyscale copy of the photo is shipped, as the source for the characters; the photo itself never appears
-const PHOTO = `${import.meta.env.BASE_URL}esh-luma.png`
+const PHOTO = lumaUrl
 const CMD = 'ascii --render esh.png'
 const RAMP = ' .\'`:-~=+*cox#%8&@'
 
@@ -99,7 +100,7 @@ export default function Portrait({ className = '' }) {
 
   const done = rows > 0 && shown >= rows
   return (
-    <figure className={`flex flex-col overflow-hidden rounded-md border border-rule-2 bg-[color-mix(in_srgb,var(--ink)_3%,var(--canvas))] font-mono ${className}`}>
+    <figure data-portrait="" className={`flex flex-col overflow-hidden rounded-md border border-rule-2 bg-[color-mix(in_srgb,var(--ink)_3%,var(--canvas))] font-mono ${className}`}>
       <div className="flex items-center gap-1.5 border-b border-rule px-2.5 py-1.5" aria-hidden="true">
         <span className="size-[7px] rounded-full bg-rule-2" />
         <span className="size-[7px] rounded-full bg-rule-2" />

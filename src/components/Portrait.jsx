@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { toGrid } from './asciiGrid'
 
 // A small terminal that renders my photo as ASCII: it types the command, prints the portrait row by
-// row, then waits at a prompt. Hover or tap shows the photo itself.
+// row, then waits at a prompt.
 // The terminal follows the theme: white characters on dark, black on light.
-const PHOTO = `${import.meta.env.BASE_URL}me.jpg`
+// only a small greyscale copy of the photo is shipped, as the source for the characters; the photo itself never appears
+const PHOTO = `${import.meta.env.BASE_URL}esh-luma.png`
 const CMD = 'ascii --render esh.png'
 const RAMP = ' .\'`:-~=+*cox#%8&@'
 
@@ -24,7 +25,6 @@ export default function Portrait({ className = '' }) {
   const [grid, setGrid] = useState(null)
   const [typed, setTyped] = useState(0)
   const [shown, setShown] = useState(0)
-  const [photo, setPhoto] = useState(false)
   const [ready, setReady] = useState(false)
   const imgRef = useRef(null)
   const rows = grid ? grid.rows : 0
@@ -110,25 +110,11 @@ export default function Portrait({ className = '' }) {
         <span className="text-signal">$</span> {CMD.slice(0, typed)}
         {typed < CMD.length && <span className="ml-px inline-block h-[1.05em] w-[0.55em] translate-y-[2px] bg-ink-2 [animation:blink_1s_steps(1)_infinite]" />}
       </div>
-      <button
-        type="button"
-        // a mouse shows the photo while it hovers; a tap (or the keyboard) switches between the two
-        onPointerEnter={(e) => { if (e.pointerType === 'mouse' && done) setPhoto(true) }}
-        onPointerLeave={(e) => { if (e.pointerType === 'mouse') setPhoto(false) }}
-        onClick={(e) => { if (e.nativeEvent.pointerType !== 'mouse' || e.detail === 0) setPhoto((v) => !v) }}
-        aria-label="Photo of Eshaan Singla. Press to switch between the ASCII render and the photo."
-        className="relative mx-2.5 mt-1 min-h-0 flex-1 cursor-pointer overflow-hidden text-left"
-      >
+      <div role="img" aria-label="ASCII portrait of Eshaan Singla" className="relative mx-2.5 mt-1 min-h-0 flex-1 overflow-hidden">
         <div ref={body} className="absolute inset-0">
           <canvas ref={canvas} className="absolute inset-0 size-full" aria-hidden="true" />
-          <img
-            src={PHOTO}
-            alt=""
-            loading="lazy"
-            className={`absolute inset-0 size-full object-cover object-[50%_25%] transition-opacity duration-500 ${photo && done ? 'opacity-100' : 'opacity-0'}`}
-          />
         </div>
-      </button>
+      </div>
       <div className="px-2.5 pb-1.5 pt-1 text-[10.5px] leading-[1.5] text-ink-2" aria-hidden="true">
         {done ? (
           <>
